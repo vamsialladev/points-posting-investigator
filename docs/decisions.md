@@ -133,4 +133,7 @@ this decision. Updates are added as dated bullets; nothing is rewritten.
 - **Result:** the guard's own test caught a bug in its first version. Counting at `pytest_collection_modifyitems`
   happened before `-m` deselection, so `-m "not postgres"` stayed green. The count moved to
   `pytest_collection_finish` (`tests/test_required_markers.py::test_deselecting_every_required_test_fails_too`).
+- **Update (2026-11-16):** gitleaks v8.30.1 on a repository with no commits prints "0 commits scanned … no leaks
+  found" and **exits 0** (verification log, M1 #13). gitleaks alone would report a pass that scanned nothing; the
+  script's count check is what fails it.
 - **What would change this decision:** nothing foreseen. It is a standing rule.

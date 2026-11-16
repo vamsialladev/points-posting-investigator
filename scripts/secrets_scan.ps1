@@ -4,7 +4,8 @@
 $ErrorActionPreference = "Continue"  # Docker writes progress to stderr; exit codes are checked below
 Set-Location (Split-Path -Parent $PSScriptRoot)
 $image = "ghcr.io/gitleaks/gitleaks:v8.30.1"
-$output = & docker run --rm -v "${PWD}:/repo" $image git /repo --redact --no-banner 2>&1 | Out-String
+# gitleaks logs to stderr; "$_" turns PowerShell 5.1's error records back into plain lines (no NativeCommandError noise).
+$output = & docker run --rm -v "${PWD}:/repo" $image git /repo --redact --no-banner --no-color 2>&1 | ForEach-Object { "$_" } | Out-String
 $code = $LASTEXITCODE
 Write-Host $output.Trim()
 $match = [regex]::Match($output, "(\d+) commits scanned")
