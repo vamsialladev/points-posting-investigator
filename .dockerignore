@@ -1,0 +1,18 @@
+# Keep secrets, ground truth and generated data out of every image (Stage 9 ADR-0040 pattern).
+.env
+.env.*
+.git
+.venv
+benchmarks/
+docs/
+tests/
+scripts/
+portfolio/
+.claude/
+**/__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.log

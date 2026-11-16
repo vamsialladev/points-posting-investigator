@@ -1,0 +1,62 @@
+# Secrets: never commit. .env.example is the only env file in Git (spec 0.3, Appendix B).
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+secrets/
+.secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.egg-info/
+build/
+dist/
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Terraform (v2)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+*.tfvars
+!*.tfvars.example
+
+# Local runtime data and scratch
+.local/
+*.log
+tmp/
+benchmarks/results/**/scratch/
+
+# Portfolio brand content lives outside every repo
+brand-content/
+
+# Database dumps: never committed
+backups/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.stackdump

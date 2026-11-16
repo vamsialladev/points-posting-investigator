@@ -1,0 +1,8 @@
+# LF everywhere so file checksums (benchmark manifests, freeze files) match on Windows and Linux.
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.png binary
+*.jpg binary
+*.webp binary
+*.mp4 binary
+*.pdf binary
