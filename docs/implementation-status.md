@@ -43,5 +43,5 @@ Plus `Planned (M#)` for a v1 requirement no milestone has reached, and `Planned 
 
 | Release | Rows | Implemented and verified | Manual step required | Planned |
 |---|---|---|---|---|
-| v1 | 141 | 32 | 1 | 108 |
+| v1 | 142 | 34 | 0 | 108 |
 | v2 | 32 | 0 | 0 | 32 |

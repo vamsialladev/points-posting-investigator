@@ -34,7 +34,8 @@ Every requirement in `docs/MASTER-SPEC.md` has one row, plus the owner's standin
 | P0-17 | Claude Code is the builder; Codex steps kept as an optional exercise | owner | 1 | v1 | 1 | ADR-0001, `AGENTS.md` | `tests/test_repo_guidance.py::test_agents_md_points_to_claude_md` | Implemented and verified |
 | P0-18 | Commits use the owner's noreply email | rule 6 | 1 | v1 | 1 | repo-local `user.email` | `docs/verification-log.md` M1 (git log check) | Implemented and verified |
 | P0-19 | `CLAUDE.md` with the owner's ten standing rules | owner | 1 | v1 | 1 | `CLAUDE.md` | `tests/test_repo_guidance.py::test_claude_md_keeps_the_owners_standing_rules` | Implemented and verified |
-| P0-20 | Ask before creating the public GitHub repo; branches, PRs, merge commits on green CI | rule 6 | 1 | v1 | 1 | `CLAUDE.md` rule 6 | `docs/session-handoff.md` (waiting on the owner) | Manual step required |
+| P0-20 | Ask before creating the public GitHub repo; branches, PRs, merge commits on green CI | rule 6 | 1 | v1 | 1 | Owner's OK 2026-11-16; public repo with secret scanning and push protection | `docs/verification-log.md` M1 #23–#24 | Implemented and verified |
+| P0-21 | Secret deny rules also where the owner starts sessions (`C:\projects\project1`), outside every repo | rule 4, owner | 1 | v1 | 1 | `C:\projects\project1\.claude\settings.json` (not committed), ADR-0008 | `docs/verification-log.md` M1 #19–#22 | Implemented and verified |
 
 ## Part A: discovery (fictional, labelled)
 

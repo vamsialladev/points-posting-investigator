@@ -137,3 +137,36 @@ this decision. Updates are added as dated bullets; nothing is rewritten.
   found" and **exits 0** (verification log, M1 #13). gitleaks alone would report a pass that scanned nothing; the
   script's count check is what fails it.
 - **What would change this decision:** nothing foreseen. It is a standing rule.
+
+## ADR-0008: Secret deny rules also live at the project1 level, where sessions start
+- **Context:** the owner starts Claude Code sessions in `C:\projects\project1`, not inside this repo (2026-11-16).
+  This repo's `.claude/settings.json` may then not apply, so a session could read `.env` here or in any other project.
+- **Options considered:**
+  1. Keep the rules only in each repo, and ask the owner to start sessions inside the repo.
+  2. Put them in the user-level settings (`~/.claude/settings.json`), so they apply everywhere on the machine.
+  3. Add equivalent rules to `C:\projects\project1\.claude\settings.json`, covering every project under project1.
+- **Decision:** option 3, with the owner's permission.
+  - The file was created (none existed). The existing `settings.local.json` (allow rules only) was left untouched.
+  - It holds 206 deny rules:
+    - `Read`, `Edit` and `Write` of `.env`, `.env.*`, `secrets/**`, `.secrets/**`, `*.pem`, `*.key`, `*.p12`,
+      `*.pfx`, `id_rsa*`, `id_ed25519*` and `secrets.toml`, at the root and at any depth (`./**/`)
+    - shell reads of the same names through `cat`, `type`, `Get-Content`, `gc`, `more`, `less`, `head`, `tail`,
+      `Select-String` and `findstr`, in both Bash and PowerShell forms
+  - The file sits outside every repo and is not committed (project1 is not a Git repository). This repo's own
+    `.claude/settings.json` stays, for sessions started here.
+- **Tradeoff:**
+  - **`.env.*` also matches `.env.example`**, so Claude Code can no longer read or edit any project's template under
+    project1 (probe 21 below). Deny rules can't be excepted; keeping the template readable means replacing `.env.*`
+    with named variants (`.env.local`, `.env.bak`, `.env.production`…), at the cost of missing an unforeseen name.
+    Waiting on the owner's choice.
+  - Shell-pattern rules match command text. A reader not on the list, or a script that opens the file itself (for
+    example Python), isn't blocked. The rules are a guard against mistakes, not a sandbox.
+- **Result:** checked from this session (started in `C:\projects\project1`) right after the file was written:
+  - `Read` of `C:\projects\project1\deny-canary\.env`: refused ("denied by your permission settings")
+  - `Get-Content` of the same path: refused
+  - `Read` of this repo's `.env.example`: refused
+
+  The canary file was never created: the command that would have created it was blocked too. So the rules matched on
+  the path alone, and no real `.env` was ever opened. Verification log, M1 #19–#22.
+- **What would change this decision:** the owner preferring machine-wide rules (option 2), or starting sessions inside
+  each repo.

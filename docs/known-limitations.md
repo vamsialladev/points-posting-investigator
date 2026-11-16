@@ -10,10 +10,15 @@ Kept current at every milestone. Each line says what is limited, why, and what w
 - **Preflight checks format, not validity.** It catches empty values, typos and wrong shapes (for example a key
   without `sk-ant-`). It can't tell whether a key is revoked or has spend left; a live smoke test (only with the
   owner's approval) does that.
-- **`.env` deny rules are configured but not yet observed working here.** `.claude/settings.json` denies reading
-  `.env`. Owner check: start Claude Code inside this folder and ask it to read `.env`; it must be refused.
-- **No GitHub repository and no GitHub Actions yet.** Checks ran locally (`scripts\ci_local.ps1`). Creating the
-  public repo waits for the owner's OK.
+- **The project1-wide deny rules also block `.env.example`** (ADR-0008): `.env.*` matches it in every project under
+  project1, so Claude Code can't read or edit any template there. Waiting on the owner's choice to keep that or name
+  the variants instead.
+- **Shell deny rules match command text, not file access.** A reader not on the list, or a script that opens the file
+  itself, isn't blocked. They guard against mistakes; they are not a sandbox.
+- **The deny rules were observed in this session only,** which loaded them right after they were written. A fresh
+  session started in `C:\projects\project1` is the owner's confirming check (`docs/session-handoff.md`).
+- **No GitHub Actions yet.** The public repo exists (2026-11-16), but CI arrives in M2; until then the checks are local
+  (`scripts\ci_local.ps1`), so "merge when CI is green" can't apply to a PR yet.
 - **`scripts\leaks.ps1` reports NOT RUN until `.env` exists.** That is by design (ADR-0007), not a fault.
 - **The Makefile is untested on the owner's machine**, which has no `make`. The `scripts\*.ps1` twins are what ran.
 - **No independent review.** The continuity review, the matrix and the discovery were written by Claude Code from
