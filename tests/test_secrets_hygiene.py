@@ -38,6 +38,61 @@ def test_claude_code_is_denied_env_files():
     assert any(rule.startswith("PowerShell(Get-Content") for rule in deny)
 
 
+def test_claude_code_is_denied_any_file_ending_in_env():
+    """ADR-0009: prod.env or deny-canary.env is as secret as .env, for Read, Edit and Write alike."""
+    deny = json.loads(read(".claude/settings.json"))["permissions"]["deny"]
+    for tool in ("Read", "Edit", "Write"):
+        for pattern in ("./*.env", "./**/*.env"):
+            assert f"{tool}({pattern})" in deny, f"{tool}({pattern})"
+
+
+def test_the_template_stays_readable():
+    """No file rule may match .env.example (a broad `.env.*` would; ADR-0009)."""
+    deny = json.loads(read(".claude/settings.json"))["permissions"]["deny"]
+    file_rules = [rule for rule in deny if rule.startswith(("Read(", "Edit(", "Write("))]
+    targets = [rule.split("(", 1)[1].rstrip(")") for rule in file_rules]
+    assert targets, "no file rules found, so nothing was checked"
+    for target in targets:
+        for path in (".env.example", "services/ledger/.env.example"):
+            assert not glob_matches(target, path), f"{target} would block {path}"
+
+
+def glob_matches(pattern: str, path: str) -> bool:
+    """gitignore-style match of a permission path: `**/` any directories, `*` and `?` within one name."""
+    pattern = pattern.removeprefix("./")
+    regex = ""
+    i = 0
+    while i < len(pattern):
+        if pattern.startswith("**/", i):
+            regex, i = regex + "(?:.*/)?", i + 3
+        elif pattern.startswith("**", i):
+            regex, i = regex + ".*", i + 2
+        elif pattern[i] == "*":
+            regex, i = regex + "[^/]*", i + 1
+        elif pattern[i] == "?":
+            regex, i = regex + "[^/]", i + 1
+        else:
+            regex, i = regex + re.escape(pattern[i]), i + 1
+    return re.fullmatch(regex, path) is not None
+
+
+@pytest.mark.parametrize(
+    ("pattern", "path", "expected"),
+    [
+        ("./**/*.env", "prod.env", True),
+        ("./**/*.env", "a/b/deny-canary.env", True),
+        ("./*.env", ".env", True),
+        ("./.env.*", ".env.example", True),  # why the broad rule had to go
+        ("./**/.env.local", "x/.env.local", True),
+        ("./secrets/**", ".env.example", False),
+        ("./**/*.env", ".env.example", False),
+    ],
+)
+def test_glob_matches_knows_the_cases_that_matter(pattern, path, expected):
+    # The template test above is only as good as this matcher: check it on known answers (rule 7).
+    assert glob_matches(pattern, path) is expected
+
+
 def test_gitleaks_is_pinned_to_one_version_everywhere():
     for rel in (".pre-commit-config.yaml", "scripts/secrets_scan.ps1", "Makefile"):
         text = read(rel)

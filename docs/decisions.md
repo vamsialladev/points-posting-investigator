@@ -168,5 +168,50 @@ this decision. Updates are added as dated bullets; nothing is rewritten.
 
   The canary file was never created: the command that would have created it was blocked too. So the rules matched on
   the path alone, and no real `.env` was ever opened. Verification log, M1 #19–#22.
+- **Update (2026-11-17):** the `.env.example` tradeoff is resolved by ADR-0009: named variants replace `.env.*`, and
+  `*.env` is added.
 - **What would change this decision:** the owner preferring machine-wide rules (option 2), or starting sessions inside
   each repo.
+
+## ADR-0009: Block every file ending in `.env`; keep `.env.example` readable, and test that it stays safe
+- **Context:** a fresh session started in `C:\projects\project1` (2026-11-17) refused all three probes of a `.env`.
+  But a Read of `deny-canary\prod.env` **was not** refused: it reached the filesystem ("File does not exist"). The
+  file rules matched `.env` and `.env.*` only, so `prod.env` or `deny-canary.env` was open to Read, Edit and Write.
+  Only the shell rules (`*.env`) covered them. Separately, `.env.*` also blocked the safe `.env.example` everywhere
+  (ADR-0008). The owner asked to close the first gap, keep the template readable, and test that the template never
+  holds a real-looking value.
+- **Options considered:**
+  1. Keep `.env.*` and add `*.env`: closes the gap, but every template stays unreadable.
+  2. An exclusion glob such as `.env.[!e]*`: unclear in Claude Code's matcher, and it also opens `.env.enc` or
+     `.env.edge`.
+  3. Named variants instead of `.env.*`, plus `*.env`, plus a test that the template is safe to read.
+- **Decision:** option 3.
+  - **project1** (`C:\projects\project1\.claude\settings.json`, outside every repo): Read, Edit and Write of `*.env`
+    and of `.env.local/.development/.dev/.staging/.stage/.production/.prod/.test/.testing/.ci/.live/.preview/.docker/
+    .secret/.secrets/.bak/.backup/.old/.orig/.save/.copy/.tmp`, plus `.env.*.local`, `.env*.bak`, `.env*.backup`,
+    `.env*.old` and `.env*~`, at the root and any depth. The six broad `.env.*` file rules were removed; nothing else
+    was. 206 → 368 rules: 228 file rules, 140 shell rules.
+  - **Shell reads keep the broad `*.env.*`**, so `Get-Content .env.example` is still refused. The Read tool is how
+    templates are read and edited, and a shell rule that is too broad fails safe.
+  - **This repo's** `.claude/settings.json` gets `*.env` for Read, Edit and Write. It never had `.env.*`.
+  - **New tests:**
+    - `tests/test_env_template.py`: `.env.example` holds no real-looking value. Two layers:
+      - secret shapes anywhere in the file, comments included: Anthropic, GitHub, AWS and Slack credentials, private
+        keys, a password written into a URL, JWTs
+      - any value for a secret variable, or a random-looking credential
+
+      Its detector is tested first on 10 planted fakes and 7 safe defaults. The fakes are split with `+`, so no
+      scanner sees a whole credential in the source.
+    - `tests/test_secrets_hygiene.py`: the repo's rules cover `*.env` for all three tools, and no file rule matches
+      `.env.example` (checked with a glob matcher that is itself tested on known answers).
+- **Tradeoff:**
+  - A secret file named with an unlisted variant (say `.env.qa`) is open to the Read tool. It is still refused to the
+    shell readers.
+  - Files ending in `.env` that hold no secret are blocked too. Stage 9's `config/environments/*.env` is an example,
+    but Stage 9 is read-only here anyway.
+- **Result:** verification log, M1 #25–#33. Before the change, `prod.env` was not refused; after it, `prod.env`,
+  `deny-canary.env` and `.env.local` were refused to Read, and Write of `prod.env` was refused. `.env.example` reads
+  normally. The project1 file was checked with the same tested matcher: 228 file rules, none matches `.env.example`,
+  and every listed secret name is matched.
+- **What would change this decision:** a new env-file naming habit (add the variant), or Claude Code adding
+  exception rules (go back to `.env.*` with an exception for `.env.example`).
