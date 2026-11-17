@@ -12,7 +12,9 @@ Kept current at every milestone. Each line says what is limited, why, and what w
   owner's approval) does that.
 - **Env-file variants are named, not globbed** (ADR-0009). That keeps `.env.example` readable, but a secret file
   with an unlisted variant (say `.env.qa`) is open to the Read tool. Shell readers still refuse it (`*.env.*`), and so
-  does `Get-Content .env.example`, by choice: templates are read with the Read tool.
+  does `Get-Content .env.example`, by choice: templates are read with the Read tool. Inside this repo, such a file
+  fails `tests/test_secrets_hygiene.py` the next time the tests run, but not the moment it is created. Elsewhere under
+  project1 nothing checks for it.
 - **Every file ending in `.env` is blocked, secret or not** (ADR-0009). Stage 9's non-secret
   `config/environments/*.env` is an example; Stage 9 is read-only here anyway.
 - **Shell deny rules match command text, not file access.** A reader not on the list, or a script that opens the file
@@ -21,7 +23,8 @@ Kept current at every milestone. Each line says what is limited, why, and what w
   Slack, private keys, URL passwords, JWTs, and random-looking letters-and-digits runs of 24 or more. A short real
   password typed into a non-secret name would pass it. gitleaks (pre-commit and history scan) is the second layer.
 - **No GitHub Actions yet.** The public repo exists (2026-11-16), but CI arrives in M2; until then the checks are local
-  (`scripts\ci_local.ps1`), so "merge when CI is green" can't apply to a PR yet.
+  (`scripts\ci_local.ps1`), so "merge when CI is green" can't apply to a PR yet. PR #1 was merged without CI as a
+  one-time exception the owner approved (verification log #34); PRs opened before M2's CI wait for it.
 - **`scripts\leaks.ps1` reports NOT RUN until `.env` exists.** That is by design (ADR-0007), not a fault.
 - **The Makefile is untested on the owner's machine**, which has no `make`. The `scripts\*.ps1` twins are what ran.
 - **No independent review.** The continuity review, the matrix and the discovery were written by Claude Code from

@@ -1,6 +1,7 @@
 """Secrets stay out of Git, images and Claude Code's reach (rule 4, spec 0.3 and Part I)."""
 
 import json
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -9,6 +10,11 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 GITLEAKS = "ghcr.io/gitleaks/gitleaks:v8.30.1"
+# The owner starts sessions in the parent folder, so its rules are the ones that apply there (ADR-0008).
+PROJECT1_SETTINGS = ROOT.parent / ".claude" / "settings.json"
+TEMPLATE = ".env.example"
+ENV_NAME = re.compile(r"\.env(\..+)?|.+\.env")  # .env, .env.qa, .env.prod.bak, prod.env
+SKIP_DIRS = {".git", ".venv", "node_modules", "__pycache__", ".mypy_cache", ".ruff_cache", ".pytest_cache"}
 
 
 def read(rel: str) -> str:
@@ -91,6 +97,58 @@ def glob_matches(pattern: str, path: str) -> bool:
 def test_glob_matches_knows_the_cases_that_matter(pattern, path, expected):
     # The template test above is only as good as this matcher: check it on known answers (rule 7).
     assert glob_matches(pattern, path) is expected
+
+
+def walk_files(root: Path) -> list[str]:
+    """Every file under root (tracked, untracked and ignored alike), as posix paths; tool caches skipped."""
+    found = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+        found += [Path(dirpath, name).relative_to(root).as_posix() for name in filenames]
+    return sorted(found)
+
+
+def env_files(paths: list[str]) -> list[str]:
+    """Files named like an env file, except the template. Names only: no file is ever opened."""
+    return [p for p in paths if ENV_NAME.fullmatch(p.rsplit("/", 1)[-1]) and p.rsplit("/", 1)[-1] != TEMPLATE]
+
+
+def not_denied_to_read(files: list[str], deny: list[str], prefix: str = "") -> list[str]:
+    """The files no Read rule matches. `prefix` maps repo paths onto a parent folder's rules."""
+    targets = [rule[5:-1] for rule in deny if rule.startswith("Read(") and rule.endswith(")")]
+    assert targets, "no Read rules found, so nothing was checked"
+    return [f for f in files if not any(glob_matches(t, prefix + f) for t in targets)]
+
+
+def test_every_env_file_in_the_repo_is_denied_to_read():
+    """An `.env.qa` that no named rule covers would be readable (ADR-0009's known gap): fail and name it."""
+    paths = walk_files(ROOT)
+    assert TEMPLATE in paths, "the walk did not see the template, so it scanned the wrong place"
+    deny = json.loads(read(".claude/settings.json"))["permissions"]["deny"]
+    open_files = not_denied_to_read(env_files(paths), deny)
+    assert not open_files, f"add a Read deny rule (and Edit/Write) for: {open_files}"
+
+
+def test_every_env_file_in_the_repo_is_denied_at_the_project1_level():
+    """Same check against the parent folder's rules, which apply to sessions started there. Local only."""
+    if not PROJECT1_SETTINGS.exists():
+        pytest.skip("no project1 settings here (CI): the repo-level test above still runs")
+    deny = json.loads(PROJECT1_SETTINGS.read_text(encoding="utf-8"))["permissions"]["deny"]
+    open_files = not_denied_to_read(env_files(walk_files(ROOT)), deny, prefix=f"{ROOT.name}/")
+    assert not open_files, f"add a Read deny rule to {PROJECT1_SETTINGS} for: {open_files}"
+
+
+def test_the_env_file_check_catches_an_uncovered_variant(tmp_path):
+    # Rule 7: prove the check fails when it should, on planted names (empty files, no values).
+    for rel in (".env", ".env.qa", ".env.example", "sub/.env.local", "sub/qa.env", "app.py", ".venv/.env.qa"):
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).touch()
+    deny = ["Read(./.env)", "Read(./**/.env.local)", "Read(./**/*.env)", "Bash(cat .env.qa)"]
+    files = env_files(walk_files(tmp_path))
+    assert files == [".env", ".env.qa", "sub/.env.local", "sub/qa.env"]
+    assert not_denied_to_read(files, deny) == [".env.qa"]
+    assert not_denied_to_read(files, [*deny, "Read(./**/.env.qa)"]) == []
+    assert not_denied_to_read([".env.qa"], ["Read(./**/.env.qa)"], prefix="repo/") == []
 
 
 def test_gitleaks_is_pinned_to_one_version_everywhere():
