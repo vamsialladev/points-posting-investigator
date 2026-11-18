@@ -1,7 +1,28 @@
 # Verification log
 
 Real results only, newest milestone first. Each row: what was checked, the exact command, and the result. Tool: Claude
-Code (Opus 5.5) did all of Milestone 1.
+Code (Opus 5.5) did all of Milestone 1 and Milestone 2 so far.
+
+## Milestone 2, PR-A: the stack, the ledger mock, CI (2026-11-17)
+RFC-0001 approved by the owner as written (2026-11-17, ADR-0010). Local stack only, synthetic data, $0, no AI.
+
+| # | Check | Command | Result |
+|---|---|---|---|
+| 1 | Versions on the build day | Docker Hub tag list; GitHub releases; PyPI JSON | `apache/kafka` newest 4.4.0 (2026-10-22); Karapace 6.2.4 (2026-10-02); `python:3.12.16-slim`; `confluent-kafka` 2.16.1 (2026-10-28). Actions: checkout v7.0.1 `3d3c42e5`, setup-uv v10.3.3 `68559e99` |
+| 2 | Images pulled, with digests | `docker pull`; `docker image inspect` | kafka 458 MB `sha256:833b867a…`; karapace **1.72 GB** `sha256:005eda40…` (the RFC called Confluent's "heavier" without checking: corrected, ADR-0010); postgres 294 MB `sha256:aa6cb33c…`; python 119 MB `sha256:5e2bdb1b…`; uv `sha256:32a7bb39…` |
+| 3 | `new_env.ps1 -AddMissing` on a throwaway copy | scratchpad script: create a `.env`, blank one name, delete another, run `-AddMissing` twice, then a plain run | both names added; `POSTGRES_PASSWORD` unchanged; 0 values in the output; second run "Nothing to add"; plain run on an existing file exit 1; copy deleted |
+| 4 | The owner's `.env` gets the two new local passwords (ADR-0011) | `scripts\new_env.ps1 -AddMissing`; `scripts\preflight.ps1 -Profile core` | "Added 2 generated local value(s): LEDGER_DB_PASSWORD, POSTING_DB_PASSWORD"; existing values kept; nothing printed; preflight core **READY** |
+| 5 | The core stack starts | `scripts\stack.ps1 up` (`compose --profile core up -d --build --wait`) | first try: db, kafka, schema-registry, ledger healthy; db-init and kafka-init exited 0. kafka-init created all 6 topics; db-init: both databases, owner (no login) and runtime roles, migrated, grants applied |
+| 6 | First integration run **hung** | `scripts\test_integration.ps1`; then `-o faulthandler_timeout=60` | stopped after 10 min. The stack dump showed libpq waiting in `connect`. A probe: `127.0.0.1` connected in 0.0 s; `localhost` (resolves to `::1` first) took 5.0 s with a 5 s timeout and no timeout means forever. Fixed by `loopback()` plus `connect_timeout=10` (ADR-0012) |
+| 7 | Postgres tests alone | `scripts\test_integration.ps1 -m postgres` | **26 passed in 9 s**. The run still exited 1: "REQUIRE_MARKERS: no test with marker(s) kafka was selected". The guard refused a run that tested no Kafka, as designed |
+| 8 | Kafka tests, first run: 2 failures, both my test code | `scripts\test_integration.ps1 -m kafka` | (a) the Avro round trip **worked**; my expected record held raw ints for `date` / `timestamp-millis` fields, which come back as Python dates. (b) `set_config` needs a `ServerConfig`, not a dict, and the cleanup's 404 hid that error. Then the registry reports `compatibilityLevel` on read, which my assert didn't use. All three were fixed in the tests; no product code changed |
+| 9 | Every infrastructure test | `scripts\test_integration.ps1` (`REQUIRE_MARKERS=postgres,kafka`) | **31 passed** (26 Postgres + 4 Kafka/Karapace + 1 smoke test against the running ledger container) |
+| 10 | What the Postgres tests prove | `tests/test_ledger_postgres.py` | 8 concurrent credits on one key → **exactly 1 row**, 1 entry ID; a replay returns the same entry; a different body is a 409 naming the entry; the superuser can't insert a second row for a key (`UniqueViolation`); the ledger runtime role is refused UPDATE, DELETE, TRUNCATE and DROP; owner roles can't log in; a runtime role can't reach the other database; a rotated password locks out the old one; migrations round-trip with no drift; the duplicate check fails on planted problems (rule 7) |
+| 11 | What the Kafka tests prove | `tests/test_kafka_stack.py` | all 6 pipeline topics exist with 3 partitions; an Avro `stay.checked_out` round-trips through Kafka and Karapace with key and headers, using `confluent-kafka`'s registry client unchanged (the RFC's main risk); the registry accepts a compatible v2 and **rejects** a breaking one under `BACKWARD_TRANSITIVE` |
+| 12 | Offline checks | `scripts\test.ps1` | ruff, format and mypy clean; **194 passed**, 30 skipped (the infrastructure tests, which need the stack); coverage **82.82%** (gate 80%) |
+| 13 | Full local CI | `scripts\ci_local.ps1` | **11/11 steps pass**: checks (sync, ruff, format, mypy, tests with coverage, pip-audit: no known vulnerabilities), integration (stack up; 31 infrastructure tests), migrations (bootstrap `ci_` databases; upgrade → downgrade → upgrade → drift check), secrets (gitleaks: 5 commits, no leaks) |
+| 14 | A shell heredoc broke a path, as CLAUDE.md warns | Python edit through a Bash heredoc | `scripts\test_integration.ps1` became `scripts<TAB>est_integration.ps1` in `ci_local.ps1`. Fixed with the editor; a search found no other tab characters in `*.py`, `*.yml`, `*.ps1`, `*.toml` or `*.md` |
+| 15 | Author identity | `git log --format=%ae` | only `339370878+vamsialladev@users.noreply.github.com` |
 
 ## Milestone 1 (2026-11-16)
 | # | Check | Command | Result |

@@ -21,3 +21,13 @@ All notable changes to this project are documented here. The format follows
 - Claude Code deny rules cover every file ending in `.env`, and keep `.env.example` readable (ADR-0009).
 - Scripts: `scripts\test.ps1`, `scripts\ci_local.ps1`, `scripts\preflight.ps1`, `scripts\new_env.ps1`,
   `scripts\leaks.ps1`, `scripts\secrets_scan.ps1` (gitleaks from a pinned image).
+- Milestone 2, PR-A (RFC-0001, ADR-0010 to ADR-0012):
+  - the core Docker Compose stack (Kafka 4.4.0 in KRaft mode, Karapace 6.2.4, Postgres 16.15) and the six pipeline
+    topics
+  - `posting` and `ledger` databases with owner (no login) and runtime roles, Alembic migrations and a drift check
+  - the ledger mock (`app/ledger/`): idempotent credits, status lookup, token expiry, rate limit, latency, a local-only
+    control endpoint
+  - the Avro schemas for `stay.checked_out` and `points.posted`
+  - the first GitHub Actions workflow: checks, real-infrastructure tests, migrations, secrets, audit
+  - `scripts\stack.ps1`, `scripts\test_integration.ps1`, `scripts\new_env.ps1 -AddMissing`
+  - new settings `LEDGER_DB_PASSWORD` and `POSTING_DB_PASSWORD`

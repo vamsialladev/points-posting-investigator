@@ -215,3 +215,63 @@ this decision. Updates are added as dated bullets; nothing is rewritten.
   and every listed secret name is matched.
 - **What would change this decision:** a new env-file naming habit (add the variant), or Claude Code adding
   exception rules (go back to `.env.*` with an exception for `.env.example`).
+
+## ADR-0010: Adopt RFC-0001 (pipeline, outbox, idempotent ledger) as approved
+- **Context:** Milestone 2 is design-heavy (standing rule 2). `docs/rfcs/RFC-0001-pipeline-outbox-ledger.md` set out
+  twelve choices, D1 to D12, with an approval checklist. The owner approved it as written on 2026-11-17.
+- **Options considered:** the alternatives in each D of the RFC (Redpanda; `aiokafka`; Confluent Schema Registry or
+  Apicurio; JSON Schema; outbox-first crediting; several relays; testcontainers).
+- **Decision:** the RFC's recommendations, D1 to D12. Pinned on the build day:
+  - images: `apache/kafka:4.4.0`, `ghcr.io/aiven-open/karapace:6.2.4`, `postgres:16.15-alpine`,
+    `python:3.12.16-slim`, `ghcr.io/astral-sh/uv:0.13.5`
+  - packages: `confluent-kafka` 2.16.1, `fastapi` 0.162.7, `sqlalchemy` 2.1.9, `psycopg` 3.3.9, `alembic` 1.20.1
+  - actions: pinned to full commit SHAs
+- **Tradeoff:** the RFC's main risk, Karapace against `confluent-kafka`'s registry client, could only be checked by
+  building. And the RFC said Karapace's image was lighter than Confluent's, which I hadn't checked: the Karapace image is
+  1.72 GB. The choice stands on the licence and the matching API, not on size.
+- **Result:** delivered in three PRs. PR-A (the stack, the ledger mock, CI): an Avro event round-trips through Kafka
+  and Karapace unchanged, and the registry enforces `BACKWARD_TRANSITIVE` (verification log, M2). Differences while
+  building are in the RFC's "Differences while building" and in ADR-0011 and ADR-0012.
+- **What would change this decision:** the RFC's own list (Kafka can't run on the owner's machine; the owner prefers
+  Confluent's registry; the relay becomes a bottleneck).
+
+## ADR-0011: Each runtime database role has its own password; owner roles can't log in
+- **Context:** RFC-0001 D9 gives each database an owner role and a runtime role, but didn't say how a service gets
+  its password. While building, the first idea was to derive each password from the Postgres superuser password (an
+  HMAC, as Stage 9's demo launcher does). That would give every service the superuser password.
+- **Options considered:**
+  1. Derive role passwords from the superuser password: no new settings, but every service could log in as superuser.
+  2. A separate password per runtime role in `.env` (`LEDGER_DB_PASSWORD`, `POSTING_DB_PASSWORD`), and owner roles
+     with NOLOGIN: migrations run as the superuser under `SET ROLE <owner>`.
+  3. One shared runtime password.
+- **Decision:** option 2. Services get only their runtime role's password. The bootstrap revokes and re-grants every
+  runtime right from one list (`app.db.roles.GRANTS`), so the rights are always exactly the listed ones.
+  `scripts\new_env.ps1 -AddMissing` adds the two new values to an existing `.env` without touching anything else.
+- **Tradeoff:** two more local secrets, and the owner's existing `.env` needed them. Claude Code ran `-AddMissing` on
+  it after testing it on a throwaway copy; no value was printed.
+- **Result:** tested on real Postgres, as the real roles:
+  - the ledger's runtime role can't UPDATE, DELETE, TRUNCATE or DROP a credit
+  - owner roles can't log in
+  - a runtime role can't reach the other database
+  - a rotated password locks out the old one
+
+  See the verification log, M2.
+- **What would change this decision:** a secret manager (v2 deployment) issuing short-lived database credentials.
+
+## ADR-0012: `localhost` means 127.0.0.1 for database connections, with a 10-second connect timeout
+- **Context:** the first integration run hung for 10 minutes. A stack dump showed libpq waiting in the connection
+  setup. On this Windows machine `localhost` resolves to `::1` first. Docker Desktop accepted that connection and
+  never answered, and libpq had no timeout.
+- **Options considered:**
+  1. Change `.env.example` to `127.0.0.1`: fixes new setups, not the owner's existing `.env`.
+  2. Bind the stack to `::1` as well.
+  3. Map `localhost` to `127.0.0.1` in one function (`app.db.roles.loopback`), and set `connect_timeout=10` on every
+     connection.
+- **Decision:** option 3. The stack binds 127.0.0.1 only, so the IPv4 address is the one that works. The timeout means
+  a connection fails in 10 s instead of hanging.
+- **Tradeoff:** a host name is rewritten in code. That is visible, tested (`tests/test_db_offline.py`), and limited to
+  `localhost`.
+- **Result:** the Postgres tests went from a 10-minute hang to 26 passing in 9 s. A probe recorded the cause:
+  `127.0.0.1` connected at once, while `localhost` took 5.0 s with a 5 s timeout.
+- **What would change this decision:** the stack binding IPv6 as well, or a deployment where `localhost` isn't the
+  Docker host.

@@ -20,8 +20,22 @@ Kept current at every milestone. Each line says what is limited, why, and what w
 - **The template test knows the secret shapes it was given** (`tests/test_env_template.py`): Anthropic, GitHub, AWS,
   Slack, private keys, URL passwords, JWTs, and random-looking letters-and-digits runs of 24 or more. A short real
   password typed into a non-secret name would pass it. gitleaks (pre-commit and history scan) is the second layer.
-- **No GitHub Actions yet.** The public repo exists (2026-11-16), but CI arrives in M2; until then the checks are local
-  (`scripts\ci_local.ps1`), so "merge when CI is green" can't apply to a PR yet.
+- **CI arrives with M2's first PR** (`.github/workflows/ci.yml`). PR #1 was merged before it existed, as a one-time
+  exception the owner approved.
+
+## Added in Milestone 2, PR-A (2026-11-17)
+- **One Kafka broker, replication factor 1.** That's fine for a local demo and wrong for production: one broker
+  failing loses the log. It's labelled dev-only (RFC-0001 D1, D7).
+- **The ledger mock doesn't check that a member exists.** It checks the `GR-#####` and `BR-` / `ML-####` shapes only.
+  The members table comes with the seeds in M2 PR-C.
+- **The ledger's control endpoint can break the ledger on purpose** (latency, rate limit, token expiry). It exists only
+  with `LEDGER_CONTROL_ENABLED=true`, needs the token, and is always off with `PUBLIC_DEMO_MODE=true`.
+- **`localhost` is rewritten to 127.0.0.1** for database connections (ADR-0012). A setup where `localhost` isn't the
+  Docker host would need its real host name in `.env`.
+- **Offline coverage leaves out the database code.** Bootstrap, migrations and the Postgres store are covered only by
+  the infrastructure tests (`scripts\test_integration.ps1`, CI `integration`). The offline gate (80%) is met without
+  them, at 82.82%.
+- **The Karapace image is 1.72 GB.** The first `stack.ps1 up` downloads about 2.3 GB of images in total.
 - **`scripts\leaks.ps1` reports NOT RUN until `.env` exists.** That is by design (ADR-0007), not a fault.
 - **The Makefile is untested on the owner's machine**, which has no `make`. The `scripts\*.ps1` twins are what ran.
 - **No independent review.** The continuity review, the matrix and the discovery were written by Claude Code from

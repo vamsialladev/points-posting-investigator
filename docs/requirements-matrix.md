@@ -53,10 +53,10 @@ Every requirement in `docs/MASTER-SPEC.md` has one row, plus the owner's standin
 
 | ID | Requirement | Spec | Tier | Release | M | Implementation | Evidence | Status |
 |---|---|---|---|---|---|---|---|---|
-| PIPE-01 | Kafka (KRaft) and a schema registry in Docker Compose; a maintained Python client (verified in current docs) | 0.4 | 1 | v1 | 2 | – | – | Planned (M2) |
+| PIPE-01 | Kafka (KRaft) and a schema registry in Docker Compose; a maintained Python client (verified in current docs) | 0.4 | 1 | v1 | 2 | `docker-compose.yml` (`apache/kafka:4.4.0`, `ghcr.io/aiven-open/karapace:6.2.4`), `app/pipeline/topics.py`, `app/pipeline/schemas.py`; `confluent-kafka` 2.16.1 (RFC-0001 D1–D3, ADR-0010) | `docs/verification-log.md` M2; `tests/test_kafka_stack.py::test_an_avro_event_round_trips_through_kafka_and_karapace`; `tests/test_kafka_stack.py::test_the_stack_has_every_pipeline_topic_with_three_partitions` | Implemented and verified |
 | PIPE-02 | Checkout event producer: `stay.checked_out`, versioned schemas, correlation IDs | B1 | 1 | v1 | 2 | – | – | Planned (M2) |
 | PIPE-03 | Posting service: validate, compute points deterministically, idempotency key = event ID, publish `points.posted` via a transactional outbox | B1 | 1 | v1 | 2 | – | – | Planned (M2) |
-| PIPE-04 | Loyalty ledger mock: idempotent credit, status lookup, rate limits, configurable latency, credential expiry | B1 | 1 | v1 | 2 | – | – | Planned (M2) |
+| PIPE-04 | Loyalty ledger mock: idempotent credit, status lookup, rate limits, configurable latency, credential expiry | B1 | 1 | v1 | 2 | `app/ledger/` (core, store, api), own database with `UNIQUE(idempotency_key)` and an INSERT-only runtime role (RFC-0001 D9, D11; ADR-0011) | `docs/verification-log.md` M2; `tests/test_ledger_postgres.py::test_concurrent_credits_for_one_key_store_exactly_one`; `tests/test_ledger_postgres.py::test_the_ledger_runtime_role_cannot_change_or_remove_a_credit`; `tests/test_ledger_api.py::test_an_expired_token_is_a_401_for_credits_and_lookups`; `tests/test_ledger_api.py::test_over_the_rate_limit_is_a_429_with_retry_after`; `tests/test_ledger_smoke.py::test_the_running_ledger_credits_once_and_refuses_a_wrong_token` | Implemented and verified |
 | PIPE-05 | Outbox relay with ordering and retry semantics documented | B1 | 1 | v1 | 2 | – | – | Planned (M2) |
 | PIPE-06 | Investigator app: UI, API, AI investigator, automation engine, recovery service, worker | B1 | 1 | v1 | 6–8 | – | – | Planned (M6) |
 | PIPE-07 | Event semantics documented and tested: at-least-once, consumer groups, commit after processing, retry topics with backoff, DLQ metadata, schema evolution, out-of-order and duplicates, partition key | B2 | 1 | v1 | 2 | – | – | Planned (M2) |
@@ -201,13 +201,13 @@ Every requirement in `docs/MASTER-SPEC.md` has one row, plus the owner's standin
 
 | ID | Requirement | Spec | Tier | Release | M | Implementation | Evidence | Status |
 |---|---|---|---|---|---|---|---|---|
-| DEL-01 | Compose profiles `core`, `observability`, `full`; migrations, seeds, scenario trigger/reset, health and readiness, graceful shutdown | K | 1 | v1 | 2–4 | – | – | Planned (M2) |
+| DEL-01 | Compose profiles `core`, `observability`, `full`; migrations, seeds, scenario trigger/reset, health and readiness, graceful shutdown | K | 1 | v1 | 2–4 | Part: `docker-compose.yml` profile `core` (health checks, `--wait`), `app/db/bootstrap.py`, `app/db/migrate.py`, ledger `/healthz` `/readyz`; still to come: posting and relay services, seeds (M2), `observability` (M4), triggers and resets (M3) | – | Planned (M2) |
 | DEL-02 | Compose profile `automation` (n8n, mock Slack/Jira) | K | 2 | v2 | 10 | – | – | Planned (v2) |
-| DEL-03 | GitHub Actions CI: ruff, mypy, pytest with Kafka and Postgres services, migration check, gitleaks, pip-audit, container scan, SBOM, Playwright, least-privilege permissions, no paid key | K | 2 | v1 | 2–13 | – | – | Planned (M2) |
+| DEL-03 | GitHub Actions CI: ruff, mypy, pytest with Kafka and Postgres services, migration check, gitleaks, pip-audit, container scan, SBOM, Playwright, least-privilege permissions, no paid key | K | 2 | v1 | 2–13 | Part: `.github/workflows/ci.yml` (checks, integration, migrations, secrets, audit; `contents: read`; SHA-pinned actions; no secret stored); still to come: container scan and SBOM (M13 slice), Playwright (M8) | – | Planned (M2) |
 | DEL-04 | Local CI equivalent with the same pinned tools | K, Stage 9 | 2 | v1 | 1 | `scripts\ci_local.ps1` (M1 jobs: checks, audit, secrets) | `docs/verification-log.md` M1 | Implemented and verified |
 | DEL-05 | Pre-commit: gitleaks (pinned image), private-key block, ruff | 0.3, §9 | 1 | v1 | 1 | `.pre-commit-config.yaml` | `docs/verification-log.md` M1 | Implemented and verified |
 | DEL-06 | lychee link check in CI | CLAUDE.md §18 | 2 | v1 | 13 | – | – | Planned (M13) |
-| DEL-07 | Schema-registry compatibility rules as a release gate | K | 1 | v1 | 2 | – | – | Planned (M2) |
+| DEL-07 | Schema-registry compatibility rules as a release gate | K | 1 | v1 | 2 | Part: `BACKWARD_TRANSITIVE` enforced by the registry (`tests/test_kafka_stack.py::test_the_registry_enforces_backward_transitive_compatibility`); the CI gate over committed schemas comes in the third M2 PR | – | Planned (M2) |
 | DEL-08 | Cloud options (2–3) with monthly costs from current official pricing, and teardown steps | K | 2 | v2 | 13 | – | – | Planned (v2) |
 | DEL-09 | Deploy only after the owner approves the option and budget; public demo mode (synthetic, mock AI or capped live, rate-limited scenario button, auto reset, no shared admin) | K | 2 | v2 | 13 | – | – | Planned (v2) |
 | DEL-10 | Verify the live URL with Playwright before adding the link | K | 2 | v2 | 13 | – | – | Planned (v2) |
