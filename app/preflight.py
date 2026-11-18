@@ -110,6 +110,9 @@ VARS: dict[str, Var] = {
         Var("POSTGRES_PASSWORD", _min_len(8), "at least 8 characters", secret=True),
         Var("POSTGRES_DB", _nonempty, "non-empty"),
         Var("DATABASE_URL", _postgres_url, "postgresql URL with user, password and host", secret=True),
+        # Runtime database roles (RFC-0001 D9): each service logs in with only its own rights.
+        Var("LEDGER_DB_PASSWORD", _min_len(8), "at least 8 characters", secret=True),
+        Var("POSTING_DB_PASSWORD", _min_len(8), "at least 8 characters", secret=True),
         # Kafka
         Var("KAFKA_BOOTSTRAP_SERVERS", _bootstrap_servers, "host:port[,host:port]"),
         Var("SCHEMA_REGISTRY_URL", _url("http", "https"), "an http(s) URL"),
@@ -162,6 +165,8 @@ _CORE = (
     "POSTGRES_PASSWORD",
     "POSTGRES_DB",
     "DATABASE_URL",
+    "LEDGER_DB_PASSWORD",
+    "POSTING_DB_PASSWORD",
     "KAFKA_BOOTSTRAP_SERVERS",
     "SCHEMA_REGISTRY_URL",
     "LEDGER_API_URL",
@@ -408,6 +413,8 @@ FEATURES: dict[str, tuple[str, ...]] = {
     "Offline pipeline and investigator (mock AI, local Docker)": (
         "APP_SECRET_KEY",
         "DATABASE_URL",
+        "LEDGER_DB_PASSWORD",
+        "POSTING_DB_PASSWORD",
         "KAFKA_BOOTSTRAP_SERVERS",
         "LEDGER_API_TOKEN",
     ),

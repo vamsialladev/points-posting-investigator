@@ -1,9 +1,11 @@
 # The CI pipeline, run on this machine with the same pinned tools (Stage 9's scripts\ci_local.ps1 pattern).
-# Milestone 1 version: the offline checks, the dependency audit and the secrets scan. Later milestones add the
-# Kafka + Postgres integration job (M2), the browser job (M8) and the image/SBOM/link jobs (M13 slice).
+# The same jobs as .github/workflows/ci.yml: checks (with the audit), integration (real Kafka, Karapace and Postgres
+# from the core compose stack), migrations (in separate ci_ databases, so the stack's data is untouched) and secrets.
+# Later milestones add the browser job (M8) and the image/SBOM/link jobs (M13 slice).
 # Usage (from the repo root):
 #   powershell -ExecutionPolicy Bypass -File scripts\ci_local.ps1
 #   powershell -ExecutionPolicy Bypass -File scripts\ci_local.ps1 -Skip secrets
+#   powershell -ExecutionPolicy Bypass -File scripts\ci_local.ps1 -Skip integration,migrations   # without Docker
 param([string[]]$Skip = @())
 $Skip = @($Skip | ForEach-Object { $_ -split "," } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 $ErrorActionPreference = "Continue"  # Docker writes progress to stderr; exit codes are checked
@@ -35,6 +37,19 @@ if ($Skip -notcontains "checks") {
         Remove-Item $req -ErrorAction SilentlyContinue
         $global:LASTEXITCODE = $code
     }
+}
+
+if ($Skip -notcontains "integration") {
+    Step "integration" "core stack up (compose --wait)" { powershell -ExecutionPolicy Bypass -File scripts\stack.ps1 up }
+    Step "integration" "infrastructure tests (REQUIRE_MARKERS=postgres,kafka)" {
+        powershell -ExecutionPolicy Bypass -File scripts\test_integration.ps1
+    }
+}
+
+if ($Skip -notcontains "migrations") {
+    # Reads DATABASE_URL and the runtime passwords from .env inside Python; nothing is printed.
+    Step "migrations" "bootstrap ci_ roles and databases" { uv run python -m app.db.bootstrap --prefix ci_ --reset }
+    Step "migrations" "upgrade, downgrade, upgrade, drift check" { uv run python -m app.db.migrate roundtrip --prefix ci_ }
 }
 
 if ($Skip -notcontains "secrets") {
