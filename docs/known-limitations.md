@@ -43,3 +43,7 @@ Kept current at every milestone. Each line says what is limited, why, and what w
   the infrastructure tests (`scripts\test_integration.ps1`, CI `integration`). The offline gate (80%) is met without
   them, at 82.82%.
 - **The Karapace image is 1.72 GB.** The first `stack.ps1 up` downloads about 2.3 GB of images in total.
+- **Ledger entry IDs are unique but can skip numbers.** A replay, or the loser of a race, still draws a sequence value
+  before `ON CONFLICT` discards its row. So after `L-0000001` and a replay, the next credit is `L-0000003`
+  (`tests/test_ledger_postgres.py::test_entry_ids_are_unique_but_not_gapless`). Nothing may assume gapless IDs. A
+  real ledger that must be gapless would number entries in a separate, locked step.

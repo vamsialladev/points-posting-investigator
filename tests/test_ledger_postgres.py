@@ -8,6 +8,7 @@ Without the URL these tests skip, and under REQUIRE_MARKERS=postgres (CI) a skip
 from __future__ import annotations
 
 import os
+import re
 import secrets
 import threading
 from collections.abc import Iterator
@@ -102,9 +103,26 @@ def test_concurrent_credits_for_one_key_store_exactly_one(ledger_engine):
         thread.join()
     assert failures == []
     assert sorted(created for _, created in results) == [False] * 7 + [True]
-    assert {credit.entry_id for credit, _ in results} == {"L-0000001"}
+    # Every caller gets the one stored entry back. WHICH number it gets depends on the race: a losing INSERT has
+    # already drawn a sequence value before ON CONFLICT discards it (CI run 44232412680 got L-0000002), so the test
+    # compares with the stored row instead of assuming L-0000001.
+    entry_ids = {credit.entry_id for credit, _ in results}
     with ledger_engine.connect() as conn:
+        stored = conn.execute(text("SELECT entry_id FROM credits WHERE idempotency_key = 'evt-race'")).scalars().all()
         assert credit_problems(conn, {"evt-race": 4500}) == []
+    assert len(entry_ids) == 1 and entry_ids == set(stored)
+    assert re.fullmatch(r"L-\d{7}", stored[0])
+
+
+def test_entry_ids_are_unique_but_not_gapless(ledger_engine):
+    """Why the race test can't expect L-0000001: a replay still draws a sequence number, so IDs can skip.
+    Uniqueness is what matters (and is a constraint); gaps are documented in docs/known-limitations.md."""
+    store = PostgresCreditStore(ledger_engine)
+    first, _ = store.credit("evt-1", REQUEST)
+    store.credit("evt-1", REQUEST)  # replay: no new row, but nextval() ran
+    second, _ = store.credit("evt-2", CreditRequest("GR-00002", "BR-0002", 100, "corr-2"))
+    assert first.entry_id == "L-0000001"
+    assert second.entry_id == "L-0000003"
 
 
 def test_the_duplicate_check_can_fail(ledger_engine, admin):
