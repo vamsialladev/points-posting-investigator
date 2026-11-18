@@ -1,0 +1,23 @@
+{
+  "type": "record",
+  "name": "StayCheckedOut",
+  "namespace": "hg_demo.pms",
+  "doc": "A guest checked out (simulated property-management system, synthetic data). Money is in cents; only room_rate_cents earns points (10 per US dollar).",
+  "fields": [
+    {"name": "event_id", "type": "string", "doc": "UUID. The ledger idempotency key for this posting."},
+    {"name": "occurred_at", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "tenant", "type": "string", "doc": "hg-demo"},
+    {"name": "property", "type": "string", "doc": "beach-resort or mountain-lodge"},
+    {"name": "stay_id", "type": "string", "doc": "BR-#### or ML-####"},
+    {"name": "member_number", "type": "string", "doc": "GR-#####; also the message key"},
+    {"name": "revision", "type": "int", "default": 1, "doc": "1 for the original; higher for a correction"},
+    {"name": "check_in", "type": {"type": "int", "logicalType": "date"}},
+    {"name": "check_out", "type": {"type": "int", "logicalType": "date"}},
+    {"name": "nights", "type": "int"},
+    {"name": "room_rate_cents", "type": "long"},
+    {"name": "taxes_cents", "type": "long", "default": 0},
+    {"name": "fees_cents", "type": "long", "default": 0},
+    {"name": "currency", "type": "string", "default": "USD"},
+    {"name": "correlation_id", "type": "string"}
+  ]
+}

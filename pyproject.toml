@@ -7,7 +7,15 @@ license = "MIT"
 authors = [{ name = "Vamsi Alla" }]
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "alembic~=1.20.1",
+    "confluent-kafka[avro,schemaregistry]~=2.16.1",
+    "fastapi~=0.162.0",
+    "httpx~=0.28.1",
+    "psycopg[binary]~=3.3.6",
+    "pydantic~=2.14.1",
     "python-dotenv~=1.2.4",
+    "sqlalchemy~=2.1.6",
+    "uvicorn~=0.54.0",
 ]
 
 [dependency-groups]

@@ -1,0 +1,19 @@
+{
+  "type": "record",
+  "name": "PointsPosted",
+  "namespace": "hg_demo.loyalty",
+  "doc": "Points were credited in the ledger (synthetic data). Published from the outbox at least once: readers dedupe on source_event_id.",
+  "fields": [
+    {"name": "event_id", "type": "string", "doc": "UUID of this message"},
+    {"name": "source_event_id", "type": "string", "doc": "The stay.checked_out event that was posted"},
+    {"name": "ledger_entry_id", "type": "string", "doc": "L-0000001 shape"},
+    {"name": "tenant", "type": "string"},
+    {"name": "member_number", "type": "string"},
+    {"name": "stay_id", "type": "string"},
+    {"name": "revision", "type": "int"},
+    {"name": "stay_points", "type": "int"},
+    {"name": "credited_points", "type": "int"},
+    {"name": "posted_at", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlation_id", "type": "string"}
+  ]
+}

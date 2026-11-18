@@ -1,0 +1,151 @@
+# The local stack (RFC-0001). Simulated systems, synthetic data, local only: every port binds to 127.0.0.1.
+#
+#   docker compose --profile core up -d --build --wait     # scripts\stack.ps1 up
+#   docker compose --profile core down                     # scripts\stack.ps1 down   (-v also deletes the data)
+#
+# Values come from .env (scripts\new_env.ps1 makes it; nothing is printed). Compose refuses to start without the
+# required ones (the `:?` lines). Profiles: core now; observability (M4) and full later.
+name: points-posting
+
+x-hardening: &hardening
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+
+x-app: &app
+  build: .
+  image: points-posting-app:local
+  profiles: [core, full]
+  read_only: true
+  tmpfs: [/tmp]
+  <<: *hardening
+
+services:
+  db:
+    image: postgres:16.15-alpine
+    profiles: [core, full]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-points}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-points}
+    ports:
+      - "127.0.0.1:${DB_HOST_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Over TCP: during first-start init the server listens on the socket only (Stage 9 lesson).
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    # The entrypoint starts as root, fixes the data folder's owner, then drops to the postgres user.
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+
+  kafka:
+    image: apache/kafka:4.4.0
+    profiles: [core, full]
+    environment:
+      CLUSTER_ID: hg-demo-points-local-1
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: INTERNAL://:29092,CONTROLLER://:29093,EXTERNAL://:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:${KAFKA_HOST_PORT:-9092}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"  # topics come from app/pipeline/topics.py only
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_HEAP_OPTS: "-Xms512m -Xmx512m"  # RFC-0001 D1: fits Docker Desktop
+    ports:
+      - "127.0.0.1:${KAFKA_HOST_PORT:-9092}:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:29092 > /dev/null 2>&1"]
+      interval: 5s
+      timeout: 15s
+      retries: 30
+      start_period: 10s
+    <<: *hardening
+
+  schema-registry:
+    image: ghcr.io/aiven-open/karapace:6.2.4
+    profiles: [core, full]
+    entrypoint: [python3, -m, karapace]
+    environment:
+      KARAPACE_KARAPACE_REGISTRY: "true"
+      KARAPACE_BOOTSTRAP_URI: kafka:29092
+      KARAPACE_HOST: 0.0.0.0
+      KARAPACE_PORT: 8081
+      KARAPACE_ADVERTISED_HOSTNAME: schema-registry
+      KARAPACE_ADVERTISED_PROTOCOL: http
+      KARAPACE_CLIENT_ID: karapace-local-1
+      KARAPACE_GROUP_ID: karapace-local
+      KARAPACE_MASTER_ELIGIBILITY: "true"
+      KARAPACE_TOPIC_NAME: _schemas
+      KARAPACE_COMPATIBILITY: BACKWARD_TRANSITIVE  # RFC-0001 D4
+      KARAPACE_LOG_LEVEL: WARNING
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${SCHEMA_REGISTRY_HOST_PORT:-8081}:8081"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/subjects', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    <<: *hardening
+
+  db-init:
+    <<: *app
+    command: [python, -m, app.db.bootstrap]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-points}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-points}
+      LEDGER_DB_PASSWORD: ${LEDGER_DB_PASSWORD:?set LEDGER_DB_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
+      POSTING_DB_PASSWORD: ${POSTING_DB_PASSWORD:?set POSTING_DB_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  kafka-init:
+    <<: *app
+    command: [python, -m, app.pipeline.topics]
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: "no"
+
+  ledger:
+    <<: *app
+    command: [python, -m, app.ledger]
+    environment:
+      LEDGER_API_TOKEN: ${LEDGER_API_TOKEN:?set LEDGER_API_TOKEN in .env}
+      LEDGER_DB_PASSWORD: ${LEDGER_DB_PASSWORD:?set LEDGER_DB_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
+      POSTGRES_HOST: db
+      LEDGER_HOST: 0.0.0.0
+      LEDGER_CONTROL_ENABLED: "true"  # local stack only; PUBLIC_DEMO_MODE=true turns it off
+      PUBLIC_DEMO_MODE: ${PUBLIC_DEMO_MODE:-false}
+    ports:
+      - "127.0.0.1:${LEDGER_HOST_PORT:-8020}:8020"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully  # the stack is "up" only once the topics exist
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8020/readyz', timeout=3)"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+volumes:
+  pgdata:
