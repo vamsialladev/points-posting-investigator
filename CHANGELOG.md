@@ -19,6 +19,7 @@ All notable changes to this project are documented here. The format follows
   the run.
 - `tests/test_env_template.py`: fails if `.env.example` ever holds a real-looking value (ADR-0009).
 - Claude Code deny rules cover every file ending in `.env`, and keep `.env.example` readable (ADR-0009).
+- `tests/test_secrets_hygiene.py` fails if any env-named file in the repo (say `.env.qa`) has no Read deny rule.
 - Scripts: `scripts\test.ps1`, `scripts\ci_local.ps1`, `scripts\preflight.ps1`, `scripts\new_env.ps1`,
   `scripts\leaks.ps1`, `scripts\secrets_scan.ps1` (gitleaks from a pinned image).
 - Milestone 2, PR-A (RFC-0001, ADR-0010 to ADR-0012):

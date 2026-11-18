@@ -215,6 +215,14 @@ this decision. Updates are added as dated bullets; nothing is rewritten.
   and every listed secret name is matched.
 - **What would change this decision:** a new env-file naming habit (add the variant), or Claude Code adding
   exception rules (go back to `.env.*` with an exception for `.env.example`).
+- **Update (2026-11-17, owner's request):** the unlisted-variant gap is now detected. Two tests in
+  `tests/test_secrets_hygiene.py` walk the repo (tracked, untracked and ignored files; names only, nothing opened):
+  - one fails if any `.env`, `.env.*` or `*.env` file other than `.env.example` has no matching Read rule in this
+    repo's settings
+  - the other runs the same check against the project1 rules, locally (CI has no project1 file, so it skips there)
+
+  A third test plants empty files in a temporary folder to prove the check fails on an uncovered `.env.qa`. The gap
+  is caught when such a file exists and the tests run, not the moment the file is created.
 
 ## ADR-0010: Adopt RFC-0001 (pipeline, outbox, idempotent ledger) as approved
 - **Context:** Milestone 2 is design-heavy (standing rule 2). `docs/rfcs/RFC-0001-pipeline-outbox-ledger.md` set out
