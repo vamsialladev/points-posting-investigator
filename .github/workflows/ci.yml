@@ -1,0 +1,122 @@
+# CI (RFC-0001, first workflow). Offline only: no API key, no paid service, no secret stored in GitHub. Every value
+# below is a throwaway generated for this run's own containers, and masked in the log.
+# The same steps run locally:  scripts\test.ps1, scripts\stack.ps1 up, scripts\test_integration.ps1, scripts\ci_local.ps1
+# Actions are pinned to full commit SHAs (the version is in the comment).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint, types, offline tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.5"
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+      - name: Offline tests with the coverage gate (the infrastructure tests run in the next job)
+        run: uv run pytest --cov --cov-report=term-missing -rs
+
+  integration:
+    name: Real Kafka, Karapace and Postgres
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.5"
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Throwaway local values for this run (masked)
+        run: |
+          for name in POSTGRES_PASSWORD LEDGER_DB_PASSWORD POSTING_DB_PASSWORD LEDGER_API_TOKEN; do
+            value="$(openssl rand -hex 24)"
+            echo "::add-mask::$value"
+            echo "$name=$value" >> "$GITHUB_ENV"
+          done
+      - name: Start the core stack (compose --wait fails if any service is unhealthy)
+        run: docker compose --profile core up -d --build --wait --wait-timeout 300
+      - name: Infrastructure tests (a skipped or missing postgres/kafka test fails the job)
+        run: uv run python scripts/run_integration.py
+        env:
+          TEST_DATABASE_URL: postgresql+psycopg://points:${{ env.POSTGRES_PASSWORD }}@127.0.0.1:5432/points
+          TEST_KAFKA_BOOTSTRAP_SERVERS: 127.0.0.1:9092
+          TEST_SCHEMA_REGISTRY_URL: http://127.0.0.1:8081
+          TEST_LEDGER_URL: http://127.0.0.1:8020
+          TEST_LEDGER_TOKEN: ${{ env.LEDGER_API_TOKEN }}
+      - name: Stack logs (on failure)
+        if: failure()
+        run: docker compose --profile core logs --tail 300
+
+  migrations:
+    name: Migrations round trip and drift check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.5"
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Throwaway local values for this run (masked)
+        run: |
+          # Compose checks every service's required values, even when it starts only `db`.
+          for name in POSTGRES_PASSWORD LEDGER_DB_PASSWORD POSTING_DB_PASSWORD LEDGER_API_TOKEN; do
+            value="$(openssl rand -hex 24)"
+            echo "::add-mask::$value"
+            echo "$name=$value" >> "$GITHUB_ENV"
+          done
+      - run: docker compose --profile core up -d --wait db
+      - name: Bootstrap, then upgrade -> downgrade -> upgrade -> check, for both databases (ci_ roles and databases)
+        env:
+          DATABASE_URL: postgresql+psycopg://points:${{ env.POSTGRES_PASSWORD }}@127.0.0.1:5432/points
+        run: |
+          uv run python -m app.db.bootstrap --prefix ci_ --reset
+          uv run python -m app.db.migrate roundtrip --prefix ci_
+
+  secrets:
+    name: Secret scan of the full history
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: gitleaks (pinned image); a scan of 0 commits fails
+        run: pwsh -File scripts/secrets_scan.ps1
+
+  audit:
+    name: Known vulnerabilities in the locked dependencies
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.5"
+          python-version: "3.12"
+      - run: |
+          uv export --frozen --no-hashes --no-emit-project --all-groups -o requirements-audit.txt -q
+          uvx pip-audit==2.10.1 -r requirements-audit.txt --no-deps --disable-pip
