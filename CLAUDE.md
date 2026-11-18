@@ -44,6 +44,9 @@ here. **Stage 9 (`..\loyalty-support-modernization`) is read-only:** read it, re
    - Author email: `339370878+vamsialladev@users.noreply.github.com`, set repo-local. Check `git log --format=%ae`
      before any push.
    - **Ask before creating the GitHub repo** (it will be public).
+   - `main` is protected: the five CI jobs must pass, admins included (ADR-0013). A new or renamed CI job must be
+     added to the protection. Auto-merge is safe only because of that protection: PR #2 merged before CI while there
+     was none.
    - Until the repo exists, milestones go on local branches merged into `main` with `--no-ff`.
 7. **Tests:**
    - Real-database (and real-Kafka) tests wherever behaviour depends on them.

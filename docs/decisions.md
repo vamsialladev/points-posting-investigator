@@ -283,3 +283,31 @@ this decision. Updates are added as dated bullets; nothing is rewritten.
   `127.0.0.1` connected at once, while `localhost` took 5.0 s with a 5 s timeout.
 - **What would change this decision:** the stack binding IPv6 as well, or a deployment where `localhost` isn't the
   Docker host.
+
+## ADR-0013: `main` requires all five CI checks before anything merges, admins included
+- **Context:** standing rule 6 is "merge only when CI is green". On 2026-11-18 I enabled GitHub auto-merge on PR #2,
+  expecting it to wait for CI. `main` had no required checks, so auto-merge had nothing to wait for. PR #2 merged at
+  once, **before its CI ran**, and its CI then **failed**: a flaky assertion in the ledger race test (verification
+  log, M2 #19–#21). The rule had relied on me checking by hand, and the one time I relied on a tool, the tool didn't
+  check.
+- **Options considered:**
+  1. Keep merging by hand after reading `gh pr checks`, and never use auto-merge.
+  2. Branch protection on `main` that requires the five CI jobs and an up-to-date branch, for admins too, with no force
+     pushes and no deletion.
+  3. A repository ruleset with the same rules.
+- **Decision:** option 2, with the owner's OK (2026-11-18). The required checks:
+  - Lint, types, offline tests
+  - Real Kafka, Karapace and Postgres
+  - Migrations round trip and drift check
+  - Secret scan of the full history
+  - Known vulnerabilities in the locked dependencies
+- **Tradeoff:** a new or renamed CI job must be added to the protection, or a renamed one will block every merge. The
+  owner can't merge around a red check either: that's the point, and it is reversible in the repository settings.
+- **Result:** shown on PR #4, the fix for the flaky test (verification log, M2 #24):
+  - while its checks ran, GitHub reported `mergeStateStatus: BLOCKED`
+  - auto-merge, enabled with `--merge`, stayed armed and waited
+
+  No merge was attempted before the checks finished, not even as a test: the auto-mode classifier refused that
+  command, rightly.
+- **What would change this decision:** a second contributor (then add required reviews), or moving to rulesets for
+  several branches.

@@ -1,7 +1,11 @@
 # Session handoff
 
-**Updated:** 2026-11-18. Milestone 2 PR-A (#3) is merged. This file arrives on `main` with PR #2 (the M1
-follow-ups).
+**Updated:** 2026-11-18. M2 PR-A (#3) and PR #2 are merged. `main` now requires all five CI checks (ADR-0013).
+The fix for a flaky race-test assertion is in its own PR.
+
+**Read first:** PR #2 merged **before its CI ran**, which breaks standing rule 6. I enabled auto-merge while `main`
+had no required checks, so it had nothing to wait for. Its CI then failed, on a test assertion; the ledger itself
+was correct (verification log, M2 #19–#23). With your OK, `main` is now protected, so this can't happen again.
 
 ## Where things stand
 - **Milestone 1 is complete** and on `main` (https://github.com/vamsialladev/points-posting-investigator, public;
@@ -30,8 +34,9 @@ follow-ups).
     with `scripts\new_env.ps1 -AddMissing`, after testing it on a throwaway copy. Your existing values were kept,
     nothing was printed, and preflight `core` is READY.
   - **`localhost` is treated as 127.0.0.1** for database connections (ADR-0012). The first test run hung on IPv6.
-- **The stack is stopped**, with its data kept. Your machine slowed down badly while it ran alongside the tests.
-  Start it with `scripts\stack.ps1 up`; `scripts\stack.ps1 reset` deletes the data.
+- **The stack is running** again (it was restarted for the race-test fix). Your machine slowed down badly once while
+  it ran alongside the tests. Stop it with `scripts\stack.ps1 down`, which keeps the data; `scripts\stack.ps1 reset`
+  deletes it.
 - **Secret deny rules at the project1 level** (ADR-0008, ADR-0009): `C:\projects\project1\.claude\settings.json`
   (outside every repo, not committed) holds 368 deny rules. Every `*.env` file is refused to Read, Edit and Write,
   and `.env.example` stays readable.
