@@ -31,6 +31,7 @@ RFC-0001 approved by the owner as written (2026-11-17, ADR-0010). Local stack on
 | 21 | Cause: the test's assumption, not the ledger | `tests/test_ledger_postgres.py::test_entry_ids_are_unique_but_not_gapless` | a losing `INSERT … ON CONFLICT DO NOTHING` still calls `nextval()`. After `L-0000001` and a replay, the next credit is `L-0000003`. The race test now compares with the stored row, keeping "one row, everyone gets it". No product code changed. The gap is in known limitations |
 | 22 | `main` protected (owner's OK, ADR-0013) | `gh api -X PUT …/branches/main/protection` | all 5 CI jobs required; `strict` (up to date); `enforce_admins: true`; force pushes and deletion off |
 | 23 | Repeat runs of the fixed tests | full `scripts\test_integration.ps1`, then `-k "concurrent_credits or not_gapless"` 10 times | full run **32 passed**; the two ID tests **passed 10/10** |
+| 24 | The protection holds a PR until CI passes | `gh pr view 4 --json mergeStateStatus`; `gh pr merge 4 --auto --merge` | while the 5 checks ran: `mergeStateStatus: BLOCKED`. Auto-merge was then enabled, and the PR stayed **OPEN and BLOCKED**, waiting. I had planned a plain-merge attempt as proof of refusal; the auto-mode classifier refused that command, so it never ran |
 
 ## Milestone 1 (2026-11-16)
 | # | Check | Command | Result |

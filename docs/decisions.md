@@ -303,7 +303,11 @@ this decision. Updates are added as dated bullets; nothing is rewritten.
   - Known vulnerabilities in the locked dependencies
 - **Tradeoff:** a new or renamed CI job must be added to the protection, or a renamed one will block every merge. The
   owner can't merge around a red check either: that's the point, and it is reversible in the repository settings.
-- **Result:** proven on the PR that fixed the flaky test (verification log, M2 #23). A plain merge before the checks
-  finished was refused, and auto-merge then waited for them.
+- **Result:** shown on PR #4, the fix for the flaky test (verification log, M2 #24):
+  - while its checks ran, GitHub reported `mergeStateStatus: BLOCKED`
+  - auto-merge, enabled with `--merge`, stayed armed and waited
+
+  No merge was attempted before the checks finished, not even as a test: the auto-mode classifier refused that
+  command, rightly.
 - **What would change this decision:** a second contributor (then add required reviews), or moving to rulesets for
   several branches.
