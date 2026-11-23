@@ -49,7 +49,7 @@ jobs:
       - run: uv sync --frozen
       - name: Throwaway local values for this run (masked)
         run: |
-          for name in POSTGRES_PASSWORD LEDGER_DB_PASSWORD POSTING_DB_PASSWORD LEDGER_API_TOKEN; do
+          for name in POSTGRES_PASSWORD LEDGER_DB_PASSWORD POSTING_DB_PASSWORD RELAY_DB_PASSWORD LEDGER_API_TOKEN; do
             value="$(openssl rand -hex 24)"
             echo "::add-mask::$value"
             echo "$name=$value" >> "$GITHUB_ENV"
@@ -64,6 +64,8 @@ jobs:
           TEST_SCHEMA_REGISTRY_URL: http://127.0.0.1:8081
           TEST_LEDGER_URL: http://127.0.0.1:8020
           TEST_LEDGER_TOKEN: ${{ env.LEDGER_API_TOKEN }}
+          TEST_POSTING_DB_PASSWORD: ${{ env.POSTING_DB_PASSWORD }}
+          TEST_RELAY_METRICS_URL: http://127.0.0.1:9108/metrics
       - name: Stack logs (on failure)
         if: failure()
         run: docker compose --profile core logs --tail 300
@@ -83,7 +85,7 @@ jobs:
       - name: Throwaway local values for this run (masked)
         run: |
           # Compose checks every service's required values, even when it starts only `db`.
-          for name in POSTGRES_PASSWORD LEDGER_DB_PASSWORD POSTING_DB_PASSWORD LEDGER_API_TOKEN; do
+          for name in POSTGRES_PASSWORD LEDGER_DB_PASSWORD POSTING_DB_PASSWORD RELAY_DB_PASSWORD LEDGER_API_TOKEN; do
             value="$(openssl rand -hex 24)"
             echo "::add-mask::$value"
             echo "$name=$value" >> "$GITHUB_ENV"

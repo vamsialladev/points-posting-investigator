@@ -47,3 +47,23 @@ Kept current at every milestone. Each line says what is limited, why, and what w
   before `ON CONFLICT` discards its row. So after `L-0000001` and a replay, the next credit is `L-0000003`
   (`tests/test_ledger_postgres.py::test_entry_ids_are_unique_but_not_gapless`). Nothing may assume gapless IDs. A
   real ledger that must be gapless would number entries in a separate, locked step.
+
+## Added in Milestone 2, PR-B1: the outbox relay (2026-11-22)
+- **`points.posted` is at least once, not exactly once.** A relay that dies after publishing and before marking, or one
+  so slow that its lease runs out, means a second relay publishes the row again. Readers must dedupe on `event_id`.
+  The duplicate case is tested (`test_a_crash_after_publish_before_marking_publishes_twice_and_readers_dedupe`).
+- **One message per member is in flight at a time.** It keeps per-member order across relays, and caps a single
+  member's throughput at one message per relay cycle. Fine for sparse loyalty postings; a hot key would need
+  partition leases (ADR-0014, option 3).
+- **A row that fails transiently forever never goes `dead`.** Transient failures aren't counted, by design, so an
+  outage can't dead-letter good messages. Such a row shows up as outbox lag; the alert on that is written in M4.
+- **Dead rows stay dead.** Nothing replays them yet. Replay is M7: proposed, approved by someone other than the
+  requester, and audited.
+- **The relay's stats query scans the outbox every cycle.** That's fine at demo size. A real outbox needs a retention
+  job for published rows.
+- **`/metrics` has no authentication.** It binds 127.0.0.1 on the host. Prometheus, dashboards and alert rules come
+  in M4.
+- **librdkafka logs a connection failure every 2 s while Kafka is down.** It's noisy but expected; the relay itself
+  logs one warning per failed cycle.
+- **The Kafka-outage test takes about 100 s.** CI runs it once; the 10-run tally is from the owner's machine
+  (`docs/evidence/m2-pr-b1-repeat-runs.md`).

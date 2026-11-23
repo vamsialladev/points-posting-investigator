@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import contextlib
 import json
-import os
 import uuid
 from collections.abc import Iterator
 from datetime import UTC, date, datetime
@@ -27,31 +26,11 @@ from app.pipeline import schemas, topics
 pytestmark = pytest.mark.kafka
 
 
-@pytest.fixture(scope="session")
-def bootstrap() -> str:
-    servers = os.environ.get("TEST_KAFKA_BOOTSTRAP_SERVERS")
-    if not servers:
-        pytest.skip(
-            "TEST_KAFKA_BOOTSTRAP_SERVERS is not set: run scripts\\stack.ps1 up, then scripts\\test_integration.ps1"
-        )
-    return servers
-
-
-@pytest.fixture(scope="session")
-def registry() -> SchemaRegistryClient:
-    url = os.environ.get("TEST_SCHEMA_REGISTRY_URL")
-    if not url:
-        pytest.skip(
-            "TEST_SCHEMA_REGISTRY_URL is not set: run scripts\\stack.ps1 up, then scripts\\test_integration.ps1"
-        )
-    return SchemaRegistryClient({"url": url})
-
-
 @pytest.fixture
-def scratch_topic(bootstrap: str) -> Iterator[str]:
+def scratch_topic(kafka: str) -> Iterator[str]:
     name = f"test.{uuid.uuid4().hex[:12]}"
     yield name
-    AdminClient({"bootstrap.servers": bootstrap}).delete_topics([name], operation_timeout=30)
+    AdminClient({"bootstrap.servers": kafka}).delete_topics([name], operation_timeout=30)
 
 
 def stay_record() -> dict[str, object]:
@@ -75,25 +54,25 @@ def stay_record() -> dict[str, object]:
     }
 
 
-def test_the_stack_has_every_pipeline_topic_with_three_partitions(bootstrap):
-    metadata = AdminClient({"bootstrap.servers": bootstrap}).list_topics(timeout=30)
+def test_the_stack_has_every_pipeline_topic_with_three_partitions(kafka):
+    metadata = AdminClient({"bootstrap.servers": kafka}).list_topics(timeout=30)
     for spec in topics.TOPICS:
         assert spec.name in metadata.topics, f"{spec.name} missing: did kafka-init run?"
         assert len(metadata.topics[spec.name].partitions) == spec.partitions
 
 
-def test_ensure_topics_creates_only_what_is_missing(bootstrap, scratch_topic):
+def test_ensure_topics_creates_only_what_is_missing(kafka, scratch_topic):
     spec = (topics.TopicSpec(scratch_topic, partitions=2),)
-    assert topics.ensure_topics(bootstrap, spec) == [scratch_topic]
-    assert topics.ensure_topics(bootstrap, spec) == []
+    assert topics.ensure_topics(kafka, spec) == [scratch_topic]
+    assert topics.ensure_topics(kafka, spec) == []
 
 
-def test_an_avro_event_round_trips_through_kafka_and_karapace(bootstrap, registry, scratch_topic):
-    topics.ensure_topics(bootstrap, (topics.TopicSpec(scratch_topic),))
+def test_an_avro_event_round_trips_through_kafka_and_karapace(kafka, registry, scratch_topic):
+    topics.ensure_topics(kafka, (topics.TopicSpec(scratch_topic),))
     schema = schemas.latest(topics.CHECKED_OUT)
     serialize = AvroSerializer(registry, schema)
     record = stay_record()
-    producer = Producer({"bootstrap.servers": bootstrap, "enable.idempotence": True, "acks": "all"})
+    producer = Producer({"bootstrap.servers": kafka, "enable.idempotence": True, "acks": "all"})
     delivered: list[object] = []
     producer.produce(
         scratch_topic,
@@ -107,7 +86,7 @@ def test_an_avro_event_round_trips_through_kafka_and_karapace(bootstrap, registr
 
     consumer = Consumer(
         {
-            "bootstrap.servers": bootstrap,
+            "bootstrap.servers": kafka,
             "group.id": f"test-{uuid.uuid4().hex[:8]}",
             "auto.offset.reset": "earliest",
             "enable.auto.commit": False,  # D-semantics: commit after processing, never before
@@ -152,7 +131,8 @@ def test_the_registry_enforces_backward_transitive_compatibility(registry):
 
 
 def drop_subject(registry: SchemaRegistryClient, subject: str) -> None:
-    """Soft then hard delete. A subject that was never registered is fine: cleanup must not hide the real error."""
+    """Soft then hard delete. Cleanup must not hide the real error: a subject never registered, or a registry briefly
+    unavailable (calls are bounded by the client's timeout), leaves at most a stray test subject behind."""
     for permanent in (False, True):
-        with contextlib.suppress(SchemaRegistryError):
+        with contextlib.suppress(SchemaRegistryError, OSError, RuntimeError, ValueError):
             registry.delete_subject(subject, permanent=permanent)

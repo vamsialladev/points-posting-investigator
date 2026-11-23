@@ -4,6 +4,19 @@ Status: **accepted**      Milestone: 2      Author: Claude Code (Opus 5.5), for 
 **Approved by the owner on 2026-11-17, as written** (the D1–D12 recommendations). Decision record: ADR-0010.
 Everything here is a simulation with synthetic data. "Live" in this document means the local Docker stack.
 
+## Changes approved by the owner on 2026-11-22 (plan for M2 PR 2, ADR-0014)
+1. **The ledger write is not in the posting transaction.** The ledger is its own system of record (spec B1.3). The
+   posting row and its outbox row share one Postgres transaction. The ledger's `UNIQUE(idempotency_key)` makes
+   every retried credit return the same entry (D5 unchanged).
+2. **Several relays replace D6's single active relay.** Each claims only the oldest open row of each member, with
+   `FOR UPDATE SKIP LOCKED` and a lease, so per-member order holds across relays.
+3. **The relay has its own database role**, `posting_relay`, with one more local secret (`RELAY_DB_PASSWORD`).
+4. **PR 2 is split in two:**
+   - **PR-B1:** the relay
+   - **PR-B2:** the producer and the posting service
+
+   Consumer-side retry topics stay in PR-C.
+
 ## Differences while building
 PR-A (the stack, the ledger mock, CI), 2026-11-17:
 1. **Karapace isn't the lighter image.** It is 1.72 GB. D3 had called Confluent's image "heavier", which I hadn't
@@ -21,6 +34,21 @@ PR-A (the stack, the ledger mock, CI), 2026-11-17:
 6. **The ledger's `members` table moves to PR-C**, with the seeds. The ledger doesn't validate membership in M2.
 7. **The migrations job starts only Postgres.** It bootstraps separate `ci_` roles and databases, so the same command
    is safe on the owner's machine (`scripts\ci_local.ps1`).
+
+PR-B1 (the outbox relay), 2026-11-22:
+
+8. **Only permanent failures count toward dead-lettering.** The approved plan said a row goes `dead` after 5 failed
+   publishes. Counting every failure would dead-letter good messages during a 60-second Kafka outage: with a 10 s
+   delivery timeout and growing backoff, five failures come in about 65 s. So:
+   - transient failures (broker down, timeouts) are retried and not counted
+   - the relay doesn't claim while the broker is unreachable
+   - permanent failures (serialization, message too large) count, and the row goes `dead` at 5
+
+   The outage test checks `attempts == 0` for every row afterwards.
+9. **Kafka now advertises `127.0.0.1`, not `localhost`.** A new client's first metadata request took 2.20 s, because
+   `localhost` tried IPv6 `::1` first. With IPv4 it took 0.06 s, and with the fix 0.16 s. That broke the relay's
+   2-second broker check on its first cycle. Same cause as ADR-0012. `.env.example` now uses `127.0.0.1` for Kafka
+   and the registry.
 
 ## Approval checklist
 | # | Question | Answer | Where it's covered |

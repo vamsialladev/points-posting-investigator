@@ -21,7 +21,9 @@ MAPPING = {
     "TEST_SCHEMA_REGISTRY_URL": "SCHEMA_REGISTRY_URL",
     "TEST_LEDGER_URL": "LEDGER_API_URL",
     "TEST_LEDGER_TOKEN": "LEDGER_API_TOKEN",
+    "TEST_POSTING_DB_PASSWORD": "POSTING_DB_PASSWORD",
 }
+FIXED = {"TEST_RELAY_METRICS_URL": "http://127.0.0.1:9108/metrics"}  # the compose relay's port, not a secret
 
 
 def main(argv: list[str]) -> int:
@@ -36,6 +38,8 @@ def main(argv: list[str]) -> int:
             missing.append(source)
     found = len(MAPPING) - len(missing)
     print(f"stack settings: {found}/{len(MAPPING)} set" + (f"; missing {missing}" if missing else ""))
+    for name, value in FIXED.items():
+        env.setdefault(name, value)
     env["REQUIRE_MARKERS"] = "postgres,kafka"
     command = [sys.executable, "-m", "pytest", "-m", "postgres or kafka", "-rs", "-p", "no:cacheprovider", *argv]
     return subprocess.run(command, cwd=ROOT, env=env, check=False).returncode  # noqa: S603 (fixed command)

@@ -32,3 +32,16 @@ All notable changes to this project are documented here. The format follows
   - the first GitHub Actions workflow: checks, real-infrastructure tests, migrations, secrets, audit
   - `scripts\stack.ps1`, `scripts\test_integration.ps1`, `scripts\new_env.ps1 -AddMissing`
   - new settings `LEDGER_DB_PASSWORD` and `POSTING_DB_PASSWORD`
+- Milestone 2, PR-B1: the outbox relay (ADR-0014):
+  - migration `0002`: outbox delivery state (`status`, `next_attempt_at`, `claimed_by`, `lease_until`, `dead_at`,
+    `trace_context`), with check constraints and indexes
+  - `app/pipeline/relay.py`:
+    - several relays, each claiming every member's oldest open row (`FOR UPDATE SKIP LOCKED` plus a lease)
+    - at-least-once publishing with trace context in the headers
+    - transient and permanent failure classes, and dead-lettering at max attempts
+    - Prometheus metrics on `/metrics`
+  - `app/pipeline/trace.py`: W3C trace-context helpers
+  - the `posting_relay` database role and the `RELAY_DB_PASSWORD` setting; `posting_app` no longer updates the outbox
+  - the `relay` service in the core compose stack
+  - `scripts\repeat_tests.ps1`: runs a test N times and stores the tally
+- Kafka advertises `127.0.0.1` instead of `localhost`. The template uses `127.0.0.1` for Kafka and the registry.

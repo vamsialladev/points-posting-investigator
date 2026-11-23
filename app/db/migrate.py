@@ -20,7 +20,7 @@ from sqlalchemy import MetaData, create_engine, text
 from sqlalchemy.engine import URL, make_url
 from sqlalchemy.pool import NullPool
 
-from app.db.roles import CONNECT_TIMEOUT_SECONDS, GRANTS, Database, loopback
+from app.db.roles import CONNECT_TIMEOUT_SECONDS, RUNTIME_ROLES, Database, loopback
 from app.ledger.schema import metadata as ledger_metadata
 from app.pipeline.tables import metadata as posting_metadata
 
@@ -92,7 +92,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--prefix", default="")
     args = parser.parse_args(argv)
     url = admin_url_from_env()
-    for base in GRANTS:
+    for base in RUNTIME_ROLES:
         database = Database(base, args.prefix)
         if args.action in ("upgrade", "roundtrip"):
             upgrade(url, database)

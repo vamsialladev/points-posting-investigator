@@ -7,7 +7,6 @@ Without the URL these tests skip, and under REQUIRE_MARKERS=postgres (CI) a skip
 
 from __future__ import annotations
 
-import os
 import re
 import secrets
 import threading
@@ -18,57 +17,29 @@ import pytest
 from fastapi.testclient import TestClient
 from psycopg import errors
 from sqlalchemy import Engine, create_engine, text
-from sqlalchemy.engine import URL, make_url
 
 from app.db import migrate
 from app.db.bootstrap import bootstrap, conninfo
-from app.db.roles import GRANTS, Database, runtime_url
+from app.db.roles import Database
 from app.ledger.api import create_app
 from app.ledger.core import CreditRequest, LedgerSettings
 from app.ledger.schema import credits
 from app.ledger.store import IdempotencyConflict, PostgresCreditStore
+from tests.infra import LEDGER, POSTING, PREFIX, admin_connect, role_url, runtime_connect
 from tests.ledger_checks import credit_problems
 
 pytestmark = pytest.mark.postgres
-PREFIX = "test_"
-LEDGER = Database("ledger", PREFIX)
-POSTING = Database("posting", PREFIX)
 REQUEST = CreditRequest("GR-00001", "BR-0001", 4500, "corr-1")
 
 
-@pytest.fixture(scope="session")
-def admin() -> URL:
-    raw = os.environ.get("TEST_DATABASE_URL")
-    if not raw:
-        pytest.skip("TEST_DATABASE_URL is not set: run scripts\\stack.ps1 up, then scripts\\test_integration.ps1")
-    return make_url(raw)
-
-
-@pytest.fixture(scope="session")
-def passwords(admin: URL) -> dict[str, str]:
-    generated = {base: secrets.token_urlsafe(18) for base in GRANTS}  # fresh per session, never printed
-    bootstrap(admin, generated, prefix=PREFIX, reset=True)
-    return generated
-
-
-@pytest.fixture(scope="session")
-def host(admin: URL) -> dict[str, object]:
-    return {"host": admin.host or "localhost", "port": admin.port or 5432}
-
-
 @pytest.fixture
-def ledger_engine(passwords: dict[str, str], host: dict[str, object], admin: URL) -> Iterator[Engine]:
-    with psycopg.connect(**conninfo(admin, LEDGER.name), autocommit=True) as conn:
+def ledger_engine(passwords: dict[str, str], host: dict[str, object], admin) -> Iterator[Engine]:
+    with admin_connect(admin, LEDGER) as conn:
         conn.execute("TRUNCATE credits")  # as the superuser: the runtime role can't, which is tested below
         conn.execute("ALTER SEQUENCE credit_entry_seq RESTART")
-    engine = create_engine(runtime_url(LEDGER, passwords["ledger"], **host))  # type: ignore[arg-type]
+    engine = create_engine(role_url(LEDGER, passwords, host))
     yield engine
     engine.dispose()
-
-
-def runtime_connect(database: Database, password: str, host: dict[str, object]) -> psycopg.Connection:
-    url = runtime_url(database, password, **host)  # type: ignore[arg-type]
-    return psycopg.connect(**conninfo(url), autocommit=True)
 
 
 def test_a_credit_then_a_replay_then_a_conflict(ledger_engine):
@@ -152,7 +123,7 @@ def test_postgres_refuses_a_second_row_for_one_key_even_for_the_superuser(ledger
 )
 def test_the_ledger_runtime_role_cannot_change_or_remove_a_credit(ledger_engine, passwords, host, statement):
     PostgresCreditStore(ledger_engine).credit("evt-1", REQUEST)
-    with runtime_connect(LEDGER, passwords["ledger"], host) as conn, pytest.raises(errors.InsufficientPrivilege):
+    with runtime_connect(LEDGER, passwords, host) as conn, pytest.raises(errors.InsufficientPrivilege):
         conn.execute(statement)
     with ledger_engine.connect() as conn:
         assert credit_problems(conn, {"evt-1": 4500}) == []
@@ -176,17 +147,17 @@ def test_owner_roles_cannot_log_in_and_runtime_roles_are_not_privileged(admin):
     with psycopg.connect(**conninfo(admin), autocommit=True) as conn:
         rows = conn.execute(
             "SELECT rolname, rolcanlogin, rolsuper, rolcreatedb, rolcreaterole FROM pg_roles WHERE rolname = ANY(%s)",
-            ([d.owner for d in (LEDGER, POSTING)] + [d.runtime for d in (LEDGER, POSTING)],),
+            (["test_ledger_owner", "test_posting_owner", "test_ledger_app", "test_posting_app", "test_posting_relay"],),
         ).fetchall()
     roles = {name: rest for name, *rest in rows}
     assert roles["test_ledger_owner"][0] is False and roles["test_posting_owner"][0] is False
-    for runtime in ("test_ledger_app", "test_posting_app"):
+    for runtime in ("test_ledger_app", "test_posting_app", "test_posting_relay"):
         assert roles[runtime] == [True, False, False, False]
 
 
 def test_a_runtime_role_cannot_reach_the_other_database(passwords, host):
-    url = runtime_url(Database("posting", PREFIX), passwords["ledger"], **host)  # type: ignore[arg-type]
-    wrong = url.set(username=LEDGER.runtime)
+    url = role_url(Database("posting", PREFIX), passwords, host)
+    wrong = url.set(username=LEDGER.runtime, password=passwords["LEDGER_DB_PASSWORD"])
     with pytest.raises(psycopg.OperationalError, match=r"permission denied|not have CONNECT"):
         psycopg.connect(**conninfo(wrong)).close()
 
@@ -198,25 +169,15 @@ def test_a_runtime_role_cannot_reach_the_other_database(passwords, host):
         ("posting", "INSERT", True),
         ("posting", "UPDATE", False),
         ("posting", "DELETE", False),
+        ("outbox", "SELECT", True),
         ("outbox", "INSERT", True),
+        ("outbox", "UPDATE", False),  # since ADR-0014 only the relay role marks outbox rows
         ("outbox", "DELETE", False),
     ],
 )
 def test_posting_runtime_rights(passwords, admin, table, privilege, expected):
-    with psycopg.connect(**conninfo(admin, POSTING.name), autocommit=True) as conn:
+    with admin_connect(admin, POSTING) as conn:
         row = conn.execute("SELECT has_table_privilege(%s, %s, %s)", (POSTING.runtime, table, privilege)).fetchone()
-    assert row is not None and row[0] is expected
-
-
-@pytest.mark.parametrize(
-    ("column", "expected"),
-    [("published_at", True), ("attempts", True), ("last_error", True), ("payload", False), ("topic", False)],
-)
-def test_the_relay_may_mark_outbox_rows_but_not_rewrite_them(passwords, admin, column, expected):
-    with psycopg.connect(**conninfo(admin, POSTING.name), autocommit=True) as conn:
-        row = conn.execute(
-            "SELECT has_column_privilege(%s, 'outbox', %s, 'UPDATE')", (POSTING.runtime, column)
-        ).fetchone()
     assert row is not None and row[0] is expected
 
 
@@ -228,12 +189,12 @@ def test_bootstrap_runs_again_without_changing_anything(admin, passwords, ledger
 
 
 def test_a_rotated_database_password_locks_out_the_old_one(admin, passwords, host):
-    rotated = {**passwords, "ledger": secrets.token_urlsafe(18)}
+    rotated = {**passwords, "LEDGER_DB_PASSWORD": secrets.token_urlsafe(18)}
     bootstrap(admin, rotated, prefix=PREFIX)
     try:
         with pytest.raises(psycopg.OperationalError, match="password authentication failed"):
-            runtime_connect(LEDGER, passwords["ledger"], host).close()
-        runtime_connect(LEDGER, rotated["ledger"], host).close()
+            runtime_connect(LEDGER, passwords, host).close()
+        runtime_connect(LEDGER, rotated, host).close()
     finally:
         bootstrap(admin, passwords, prefix=PREFIX)  # put the session's password back
 

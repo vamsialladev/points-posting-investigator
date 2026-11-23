@@ -1,12 +1,16 @@
 """Who may connect to which database, and with which rights (RFC-0001 D9, Stage 9's owner/runtime lesson).
 
-Each database has two roles:
+Each database has:
 - an **owner** that owns the tables and runs migrations. It has NOLOGIN: the bootstrap connects as the Postgres
   superuser and runs migrations under `SET ROLE <owner>`, so no service ever holds an owner password.
-- a **runtime** role with only the rights its service needs. The ledger's runtime role can't UPDATE or DELETE a
-  credit, so a second credit or an edited one is refused by Postgres even if application code is wrong.
+- one or more **runtime** roles, each with only the rights its service needs:
+  - `ledger_app`: the ledger mock. It can't UPDATE or DELETE a credit, so a second credit or an edited one is
+    refused by Postgres even if application code is wrong.
+  - `posting_app`: the posting service. It inserts postings and outbox rows, and never changes an outbox row.
+  - `posting_relay`: the outbox relay (approved 2026-11-22, ADR-0014). It reads the outbox and may change only the
+    delivery columns. It can't add, delete or rewrite a message, and can't read the posting table.
 
-A prefix (`test_`) gives the test suite its own roles and databases, so tests never touch the running stack.
+A prefix (`test_`, `ci_`) gives tests and local CI their own roles and databases, so they never touch the stack's.
 """
 
 from __future__ import annotations
@@ -20,6 +24,43 @@ _PREFIX = re.compile(r"[a-z_]{0,16}")
 
 
 @dataclass(frozen=True)
+class RuntimeRole:
+    suffix: str  # the role is <prefix><database>_<suffix>
+    password_variable: str  # where the password comes from (.env, CI's masked value); never printed
+    grants: dict[str, str]  # "KIND name" -> privileges; anything not listed is refused
+
+
+# tests/test_ledger_postgres.py and tests/test_relay_postgres.py check each grant against the real database, both
+# what is allowed and what is not.
+RUNTIME_ROLES: dict[str, tuple[RuntimeRole, ...]] = {
+    "ledger": (
+        RuntimeRole(
+            "app",
+            "LEDGER_DB_PASSWORD",
+            {"TABLE credits": "SELECT, INSERT", "SEQUENCE credit_entry_seq": "USAGE"},
+        ),
+    ),
+    "posting": (
+        RuntimeRole(
+            "app",
+            "POSTING_DB_PASSWORD",
+            {"TABLE posting": "SELECT, INSERT", "TABLE outbox": "SELECT, INSERT", "SEQUENCE outbox_id_seq": "USAGE"},
+        ),
+        RuntimeRole(
+            "relay",
+            "RELAY_DB_PASSWORD",
+            {
+                "TABLE outbox": "SELECT, UPDATE (status, attempts, last_error, next_attempt_at, claimed_by,"
+                " lease_until, published_at, dead_at)"
+            },
+        ),
+    ),
+}
+
+PASSWORD_VARIABLES = tuple(role.password_variable for roles in RUNTIME_ROLES.values() for role in roles)
+
+
+@dataclass(frozen=True)
 class Database:
     base: str  # posting | ledger
     prefix: str = ""
@@ -27,7 +68,7 @@ class Database:
     def __post_init__(self) -> None:
         if not _PREFIX.fullmatch(self.prefix):
             raise ValueError("prefix must be lowercase letters and underscores, at most 16")
-        if self.base not in GRANTS:
+        if self.base not in RUNTIME_ROLES:
             raise ValueError(f"unknown database {self.base!r}")
 
     @property
@@ -39,27 +80,22 @@ class Database:
         return f"{self.prefix}{self.base}_owner"
 
     @property
+    def roles(self) -> tuple[RuntimeRole, ...]:
+        return RUNTIME_ROLES[self.base]
+
+    def role_name(self, suffix: str = "app") -> str:
+        if suffix not in {role.suffix for role in self.roles}:
+            raise ValueError(f"{self.base} has no {suffix!r} role")
+        return f"{self.prefix}{self.base}_{suffix}"
+
+    @property
     def runtime(self) -> str:
-        return f"{self.prefix}{self.base}_app"
+        """The main service's role (`<db>_app`)."""
+        return self.role_name("app")
 
     @property
     def password_variable(self) -> str:
-        return f"{self.base.upper()}_DB_PASSWORD"
-
-
-# Runtime rights, table by table. Anything not listed is refused. tests/test_db_roles.py checks each one against the
-# real database, both what is allowed and what is not.
-GRANTS: dict[str, dict[str, str]] = {
-    "ledger": {
-        "TABLE credits": "SELECT, INSERT",
-        "SEQUENCE credit_entry_seq": "USAGE",
-    },
-    "posting": {
-        "TABLE posting": "SELECT, INSERT",
-        "TABLE outbox": "SELECT, INSERT, UPDATE (published_at, attempts, last_error)",
-        "SEQUENCE outbox_id_seq": "USAGE",
-    },
-}
+        return self.roles[0].password_variable
 
 
 CONNECT_TIMEOUT_SECONDS = 10
@@ -72,11 +108,11 @@ def loopback(host: str | None) -> str:
     return "127.0.0.1" if host in (None, "", "localhost") else host
 
 
-def runtime_url(database: Database, password: str, host: str = "localhost", port: int = 5432) -> URL:
-    """A connection URL for the runtime role. A URL object, so the password never sits in a string we might log."""
+def runtime_url(database: Database, password: str, host: str = "localhost", port: int = 5432, role: str = "app") -> URL:
+    """A connection URL for a runtime role. A URL object, so the password never sits in a string we might log."""
     return URL.create(
         "postgresql+psycopg",
-        username=database.runtime,
+        username=database.role_name(role),
         password=password,
         host=loopback(host),
         port=port,

@@ -113,6 +113,7 @@ VARS: dict[str, Var] = {
         # Runtime database roles (RFC-0001 D9): each service logs in with only its own rights.
         Var("LEDGER_DB_PASSWORD", _min_len(8), "at least 8 characters", secret=True),
         Var("POSTING_DB_PASSWORD", _min_len(8), "at least 8 characters", secret=True),
+        Var("RELAY_DB_PASSWORD", _min_len(8), "at least 8 characters", secret=True),
         # Kafka
         Var("KAFKA_BOOTSTRAP_SERVERS", _bootstrap_servers, "host:port[,host:port]"),
         Var("SCHEMA_REGISTRY_URL", _url("http", "https"), "an http(s) URL"),
@@ -167,6 +168,7 @@ _CORE = (
     "DATABASE_URL",
     "LEDGER_DB_PASSWORD",
     "POSTING_DB_PASSWORD",
+    "RELAY_DB_PASSWORD",
     "KAFKA_BOOTSTRAP_SERVERS",
     "SCHEMA_REGISTRY_URL",
     "LEDGER_API_URL",
@@ -415,6 +417,7 @@ FEATURES: dict[str, tuple[str, ...]] = {
         "DATABASE_URL",
         "LEDGER_DB_PASSWORD",
         "POSTING_DB_PASSWORD",
+        "RELAY_DB_PASSWORD",
         "KAFKA_BOOTSTRAP_SERVERS",
         "LEDGER_API_TOKEN",
     ),
