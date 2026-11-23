@@ -311,3 +311,69 @@ this decision. Updates are added as dated bullets; nothing is rewritten.
   command, rightly.
 - **What would change this decision:** a second contributor (then add required reviews), or moving to rulesets for
   several branches.
+
+## ADR-0014: Outbox relay: several relays claim each member's oldest open row; at-least-once delivery
+- **Context:** M2's second PR publishes committed outbox rows to Kafka. It must stay correct when a relay crashes,
+  retries or runs twice, keep one member's events in order, survive a Kafka outage, and dead-letter poison without
+  blocking anyone else. The owner approved the plan on 2026-11-22, including four changes to RFC-0001:
+  1. The ledger stays a separate system of record. What shares one Postgres transaction is the posting row and its
+     outbox row (PR-B2), not the ledger write.
+  2. Several relays, replacing D6's single active relay.
+  3. A separate `posting_relay` database role.
+  4. Consumer-side retry topics stay in PR-C.
+- **Options considered:**
+  1. One active relay behind an advisory lock (RFC-0001 D6). Order is trivially kept, but there's no parallelism,
+     and failover waits on the lock.
+  2. Several relays with plain `FOR UPDATE SKIP LOCKED`. Rows are never claimed twice, but two relays can publish the
+     same member's rows 1 and 2 in the wrong order.
+  3. Several relays, each holding a lease on a hash bucket of members. Order is kept, but bucket leases, rebalancing
+     and skew add moving parts.
+  4. Several relays with `FOR UPDATE SKIP LOCKED`, where only the **oldest open row of each member** is claimable
+     (`NOT EXISTS` an older `pending`/`in_flight` row with the same key), with a lease on each claim.
+- **Decision:** option 4, with these parts:
+  - **Delivery state on the outbox row** (migration 0002):
+    - `status` (`pending`, `in_flight`, `published`, `dead`)
+    - `next_attempt_at`, `claimed_by`, `lease_until`, `dead_at`
+    - `trace_context`
+    - check constraints that tie each status to its timestamp
+  - **Marking:** only while the relay still holds the claim (`claimed_by` and `in_flight`).
+  - **At least once:** a crash after publishing and before marking means another relay publishes the row again
+    after the lease. `points.posted` readers dedupe on `event_id`, which is fixed when the row is written. Nothing
+    that reads `points.posted` writes to the ledger.
+  - **Failure classes:**
+    - Transient (broker unreachable, delivery timeout, full queue): retried after a short jittered delay. Never
+      counted, so an outage doesn't dead-letter good messages. While the broker is unreachable the relay doesn't
+      claim at all.
+    - Permanent (serialization, message too large, unknown): exponential backoff, then `dead` at `max_attempts` (5).
+      A dead row unblocks its member's later rows. Dead rows are never replayed automatically; replay is M7, with
+      approval.
+  - **Trace context:** W3C `traceparent`/`tracestate`, through a small helper until M4's OpenTelemetry.
+  - **Metrics on `/metrics`:**
+    - `outbox_oldest_unpublished_age_seconds` (lag)
+    - `outbox_unpublished_rows`
+    - `outbox_dead_rows`
+    - `outbox_publish_failures_total{error_class}`
+    - `outbox_published_total`
+    - `outbox_dead_lettered_total`
+
+    Alert rules are code in M4 (OBS-05).
+  - **The `posting_relay` role:**
+    - can read the outbox
+    - can update only the delivery columns
+    - can't insert, delete or rewrite a message
+    - can't read `posting`
+
+    `posting_app` no longer updates the outbox at all.
+- **Tradeoff:**
+  - **One member has one message in flight at a time,** so per-member throughput is one message per cycle. That's
+    fine for loyalty postings, which are sparse per member, and a real limit for a hot key.
+  - **The claim's `NOT EXISTS`** reads the member's open rows. An index (`outbox_open_by_key_idx`) serves it.
+  - **Stats scan the outbox** each cycle. That's fine at demo scale; a real one needs a retention job.
+  - **Transient retries use a fixed short delay,** not a growing one. The broker check is what stops the relay
+    hammering during an outage.
+  - **One more local secret** (`RELAY_DB_PASSWORD`).
+- **Result:** verification log, M2 PR-B1. The tests run against real Postgres and Kafka. The crash and concurrency
+  tests were each run 10 times (`docs/evidence/m2-pr-b1-repeat-runs.md`). Found while building: Kafka advertised
+  `localhost`, so every new client spent 2 s on IPv6 first. It now advertises `127.0.0.1` (same cause as ADR-0012).
+- **What would change this decision:** a hot member needing more than one message in flight (then partition-scoped
+  leases, option 3), or a broker-side transactional producer if the outbox moved into Kafka itself.

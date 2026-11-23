@@ -3,6 +3,29 @@
 Real results only, newest milestone first. Each row: what was checked, the exact command, and the result. Tool: Claude
 Code (Opus 5.5) did all of Milestone 1 and Milestone 2 so far.
 
+## Milestone 2, PR-B1: the outbox relay (2026-11-22 to 2026-11-23)
+Plan approved by the owner as written (2026-11-22), with four changes to RFC-0001 (ADR-0014). Local stack only, $0,
+no AI. Stored results: `docs/evidence/m2-pr-b1-repeat-runs-first.md` and `docs/evidence/m2-pr-b1-repeat-runs-outage.md`.
+
+| # | Check | Command | Result |
+|---|---|---|---|
+| 1 | State before starting | `gh pr view 4`; check runs on `main`; `docker compose ps` | PR #4 merged (`bad897e`, 2026-11-18 03:58 UTC); all 5 check runs on `bad897e` succeeded. The stack had been up 4 days; stopped with `stack.ps1 down` for planning (volume kept) |
+| 2 | Third runtime secret | `scripts\new_env.ps1 -AddMissing`; `scripts\preflight.ps1 -Profile core` | "Added 1 generated local value(s) to .env: RELAY_DB_PASSWORD"; nothing printed; preflight core **READY** |
+| 3 | Stack with the relay; migration 0002 on existing data | `scripts\stack.ps1 up` | all services healthy, relay included. db-init: "posting: roles posting_owner (no login), posting_app, posting_relay; migrated; grants applied" |
+| 4 | First real-stack run: 2 crash tests failed | `scripts\test_integration.ps1 -m "not chaos"` | "DID NOT RAISE RelayCrash": a brand-new relay's first broker check (2 s) failed, so the cycle returned before the fault point. A fresh producer took 2.02 s and failed with `_TRANSPORT` |
+| 5 | Cause: Kafka advertised `localhost` | a probe with `broker.address.family` any / v4 | any: OK in **2.20 s** after "Connect to ipv6#[::1]:9092 failed (after 2050ms)"; v4: OK in **0.06 s**. Kafka now advertises `127.0.0.1`: first metadata in **0.16 s**. Same cause as ADR-0012 |
+| 6 | Real-stack tests except the outage | `scripts\test_integration.ps1 -k "not chaos and not kafka_down"` | **41 passed** |
+| 7 | Outage test, first run: failed, test-data bug | `-k kafka_down` | the warm-up row used member `GR-00009`, also one of the 10 outage members, so it correctly had `[1, 1, 2, 3]`. Every outage check before that one passed. Warm-up moved to `GR-00099` |
+| 8 | Outage test after the fix | `-k kafka_down -s` | passed; **0 duplicate** messages |
+| 9 | Repeat script, first try | `scripts\repeat_tests.ps1 … -Times 2` | no summary found: an extra `-q` on top of pyproject's made `-qq`, which drops pytest's summary line. Removed |
+| 10 | **Repeat runs, batch 1** | `repeat_tests.ps1 -Times 10` on 7 tests | **10/10** each: two relays (mean 34.4 s), crash after publish (17.7 s), crash after claim (19.6 s), order under retries (21.8 s), poison dead-lettered (22.7 s), ledger 8-way race (24.6 s). **Outage: 9/10**: run 6 printed no pytest summary, and the mean was **1,363.6 s**. That script version kept no per-run output, so run 6 **can't be examined**. Kept as recorded: `m2-pr-b1-repeat-runs-first.md` |
+| 11 | Investigation | one outage run with `--durations=0`; `docker compose logs schema-registry`; a registry probe | call 79.9 s, **teardown 75.0 s**. Karapace logged `TimeoutError` after the Kafka restart. The test's registry client had **no timeout** (the client's default). Minutes later a probe registered and deleted in 0.0 s. The relay itself was never affected: its serializer had the schema ID cached |
+| 12 | Fixes (tests and script only; no relay code changed) | `tests/infra.py`, `tests/test_relay_kafka.py`, `scripts\repeat_tests.ps1` | registry client `timeout: 10`, `max.retries: 2`; the outage test waits until the registry accepts a write before reading the topic back; cleanup can't hang; the script saves the log of every run that doesn't pass |
+| 13 | **Outage test, 10 more runs** | `repeat_tests.ps1 -Tests kafka_down_for_60_seconds -Times 10` | **10/10**, mean 115.5 s, max 120.8 s. Every run: **0 duplicates**, outbox drained **73–78 s** after the outage began. The printed "registry writable 9–11 s after Kafka was back" is **mislabelled**: that clock starts after draining. Corrected in the test, with a note in `m2-pr-b1-repeat-runs-outage.md`; Karapace's full recovery time wasn't measured |
+| 14 | What the relay tests prove | `tests/test_relay_kafka.py` | one row gives 1 message with its trace ID, and lag drops to 0. Two relays and 200 rows across 20 members: claims never overlap, both relays worked, each event published once, per-member order kept. A crash after publish: 2 copies each, 3 unique after dedupe. A crash after claim: published once, after the lease. Order holds while one row retries (3 transient failures, `attempts` 0). A poison row: `dead` at 5 attempts, the other member never waited, the same member's later rows published after it. Kafka down 60 s: 30 rows waited (lag ≥ 55 s), all published, `attempts` 0, none dead, order kept. The relay role can't rewrite, delete or insert outbox rows, or read `posting`. The database refuses inconsistent states |
+| 15 | Offline checks | `scripts\test.ps1` | ruff, format, mypy clean; **219 passed**, 42 skipped (the real-stack tests); coverage **80.74%** (gate 80%) |
+| 16 | Full local CI | `scripts\ci_local.ps1` | **11/11 steps pass**, including pip-audit (no known vulnerabilities, with `prometheus-client` 0.26.0), all **42 real-stack tests** (the outage and container smoke tests included), the migrations round trip, and gitleaks |
+
 ## Milestone 2, PR-A: the stack, the ledger mock, CI (2026-11-17)
 RFC-0001 approved by the owner as written (2026-11-17, ADR-0010). Local stack only, synthetic data, $0, no AI.
 

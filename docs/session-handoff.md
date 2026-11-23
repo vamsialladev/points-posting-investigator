@@ -1,42 +1,39 @@
 # Session handoff
 
-**Updated:** 2026-11-18. M2 PR-A (#3) and PR #2 are merged. `main` now requires all five CI checks (ADR-0013).
-The fix for a flaky race-test assertion is in its own PR.
-
-**Read first:** PR #2 merged **before its CI ran**, which breaks standing rule 6. I enabled auto-merge while `main`
-had no required checks, so it had nothing to wait for. Its CI then failed, on a test assertion; the ledger itself
-was correct (verification log, M2 #19–#23). With your OK, `main` is now protected, so this can't happen again.
+**Updated:** 2026-11-23. M2 PR-B1 (the outbox relay) is built and verified locally, and its PR is open. It merges
+only when all five required checks pass. `main` is protected (ADR-0013), and auto-merge waits for green.
 
 ## Where things stand
 - **Milestone 1 is complete** and on `main` (https://github.com/vamsialladev/points-posting-investigator, public;
-  secret scanning and push protection on; auto-merge allowed since 2026-11-18, at your request for PR #3).
-  - **PR #1** (ADR-0009) was merged without CI, as a one-time exception you approved (verification log M1 #34).
-  - **PR #2** adds `tests/test_secrets_hygiene.py`. The test fails if any env-named file in the repo (say `.env.qa`)
-    has no Read deny rule. It checks this repo's rules and, on your machine, the project1 rules too (M1 #35–#37).
-- **Milestone 2 is in progress** (RFC-0001, `docs/rfcs/RFC-0001-pipeline-outbox-ledger.md`, ADR-0010), in three PRs:
-  1. **PR-A, #3, merged 2026-11-18** with a merge commit (`b1b103f`), after all 5 CI jobs passed. Contents:
-     - the core compose stack: Kafka 4.4.0, Karapace 6.2.4, Postgres 16.15, the ledger mock
-     - roles and migrations for the `posting` and `ledger` databases
-     - the first GitHub Actions workflow
-  2. **PR-B, next:** the producer, posting service, outbox and relay.
-  3. **PR-C:**
-     - retries and the DLQ
-     - corrections
-     - the load generator and seeds
-     - the schema gate
-     - `docs/event-semantics.md`
-- **Checks:** `docs/verification-log.md`. PR-A's results are under Milestone 2, #1–#15:
-  - 31 infrastructure tests pass
-  - 194 offline tests pass, with 82.82% coverage
-  - local CI passes 11 of 11 steps
-- **Changes from the RFC** are listed in the RFC's "Differences while building". The two that affect you:
-  - **Two new local secrets,** `LEDGER_DB_PASSWORD` and `POSTING_DB_PASSWORD` (ADR-0011). I added them to your `.env`
-    with `scripts\new_env.ps1 -AddMissing`, after testing it on a throwaway copy. Your existing values were kept,
-    nothing was printed, and preflight `core` is READY.
-  - **`localhost` is treated as 127.0.0.1** for database connections (ADR-0012). The first test run hung on IPv6.
-- **The stack is running** again (it was restarted for the race-test fix). Your machine slowed down badly once while
-  it ran alongside the tests. Stop it with `scripts\stack.ps1 down`, which keeps the data; `scripts\stack.ps1 reset`
-  deletes it.
+  secret scanning and push protection on; `main` requires the five CI checks, admins included).
+- **Milestone 2 is in progress** (RFC-0001 and its approved changes, ADR-0010 and ADR-0014):
+  1. **PR-A, #3, merged:**
+     - the core stack (Kafka 4.4.0, Karapace 6.2.4, Postgres 16.15)
+     - the ledger mock
+     - roles and migrations
+     - CI
+  2. **PR-B1, this PR: the outbox relay.**
+     - several relays, each claiming every member's oldest open row (`FOR UPDATE SKIP LOCKED` plus a lease)
+     - at-least-once publishing with trace headers
+     - transient vs permanent failures, with dead-lettering after 5 permanent failures
+     - `/metrics`
+     - the `posting_relay` role
+  3. **PR-B2, next:** the producer and the posting service, with the posting row and outbox row in one transaction.
+  4. **PR-C:** retry topics and the DLQ after max attempts, corrections, the load generator and seeds, the schema
+     gate, `docs/event-semantics.md`.
+- **PR-B1 checks** (`docs/verification-log.md`, M2 PR-B1 #1–#16):
+  - 42 real-stack tests pass; 219 offline tests pass, at 80.74% coverage; local CI 11/11
+  - **Repeat runs:** 6 crash and concurrency tests passed 10/10 each
+  - **The Kafka-outage test** passed 9/10 in the first batch. Run 6 left no output to examine, and the runs were
+    slow because of a registry stall in the tests. After the test fixes it passed **10/10**, with 0 duplicates.
+- **Changes since the plan that affect you:**
+  - **One more local secret,** `RELAY_DB_PASSWORD`. I added it to your `.env` with `new_env.ps1 -AddMissing`. Nothing
+    was printed, and preflight is READY.
+  - **Kafka now advertises 127.0.0.1.** It used to cost every new client 2 s on IPv6.
+  - **Only permanent publish failures count toward dead-lettering,** so a Kafka outage can't dead-letter good
+    messages. The plan had said "after 5 failed publishes".
+- **The stack is running** on your machine (with the relay). Stop it with `scripts\stack.ps1 down`, which keeps the
+  data; `scripts\stack.ps1 reset` deletes it.
 - **Secret deny rules at the project1 level** (ADR-0008, ADR-0009): `C:\projects\project1\.claude\settings.json`
   (outside every repo, not committed) holds 368 deny rules. Every `*.env` file is refused to Read, Edit and Write,
   and `.env.example` stays readable.
@@ -45,7 +42,7 @@ was correct (verification log, M2 #19–#23). With your OK, `main` is now protec
   PyPI packages, the version lookups, and GitHub Actions (free on a public repo).
 
 ## Waiting on the owner
-1. **Nothing blocks M2 PR-B.** It merges with a merge commit once its CI is green (standing rule 6).
+1. **Nothing blocks PR-B1.** It merges with a merge commit once its five checks pass (standing rule 6, ADR-0013).
 2. **Your fresh-session canary test** is still pending on your side (verification log M1 #37).
 3. **Optional, on GitHub:** turn on Dependabot alerts, and "Block command line pushes that expose my email".
 
