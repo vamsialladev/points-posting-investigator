@@ -8,6 +8,7 @@
 
 from sqlalchemy import (
     BigInteger,
+    CheckConstraint,
     Column,
     DateTime,
     Identity,
@@ -39,6 +40,15 @@ posting = Table(
     UniqueConstraint("stay_id", "revision", name="posting_stay_revision_key"),
 )
 
+# Delivery state (migration 0002, ADR-0014):
+#   pending   -> waiting; due when next_attempt_at <= now()
+#   in_flight -> claimed by `claimed_by` until `lease_until`; a crashed relay's rows become claimable when it expires
+#   published -> delivered to Kafka (published_at set)
+#   dead      -> gave up after max attempts (dead_at set): the dead-letter table. Never replayed automatically (M7).
+# The relay may only ever claim the OLDEST open row of a member (message_key), which keeps per-member order across
+# several relays: tests/test_relay_kafka.py.
+OPEN_STATUSES = ("pending", "in_flight")
+
 outbox = Table(
     "outbox",
     metadata,
@@ -47,9 +57,20 @@ outbox = Table(
     Column("message_key", Text, nullable=False),
     Column("payload", JSONB, nullable=False),
     Column("headers", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
+    Column("trace_context", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("status", Text, nullable=False, server_default=text("'pending'")),
+    Column("next_attempt_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("claimed_by", Text),
+    Column("lease_until", DateTime(timezone=True)),
     Column("published_at", DateTime(timezone=True)),
+    Column("dead_at", DateTime(timezone=True)),
     Column("attempts", Integer, nullable=False, server_default=text("0")),
     Column("last_error", Text),
-    Index("outbox_unpublished_idx", "id", postgresql_where=text("published_at IS NULL")),
+    CheckConstraint("status IN ('pending', 'in_flight', 'published', 'dead')", name="outbox_status_known"),
+    CheckConstraint("(status = 'published') = (published_at IS NOT NULL)", name="outbox_published_consistent"),
+    CheckConstraint("(status = 'dead') = (dead_at IS NOT NULL)", name="outbox_dead_consistent"),
+    CheckConstraint("(status = 'in_flight') = (lease_until IS NOT NULL)", name="outbox_lease_consistent"),
+    Index("outbox_open_by_key_idx", "message_key", "id", postgresql_where=text("status IN ('pending', 'in_flight')")),
+    Index("outbox_due_idx", "next_attempt_at", postgresql_where=text("status = 'pending'")),
 )

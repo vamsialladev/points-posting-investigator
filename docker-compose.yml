@@ -52,7 +52,9 @@ services:
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LISTENERS: INTERNAL://:29092,CONTROLLER://:29093,EXTERNAL://:9092
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:${KAFKA_HOST_PORT:-9092}
+      # 127.0.0.1, not localhost: on Windows a client given "localhost" tries ::1 first and waits 2 s for it to fail
+      # (measured in M2 PR-B1; same cause as ADR-0012). The stack binds IPv4 only.
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://127.0.0.1:${KAFKA_HOST_PORT:-9092}
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"  # topics come from app/pipeline/topics.py only
@@ -108,6 +110,7 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-points}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-points}
       LEDGER_DB_PASSWORD: ${LEDGER_DB_PASSWORD:?set LEDGER_DB_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
       POSTING_DB_PASSWORD: ${POSTING_DB_PASSWORD:?set POSTING_DB_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
+      RELAY_DB_PASSWORD: ${RELAY_DB_PASSWORD:?set RELAY_DB_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
     depends_on:
       db:
         condition: service_healthy
@@ -145,6 +148,34 @@ services:
       interval: 3s
       timeout: 5s
       retries: 30
+    restart: unless-stopped
+
+  relay:
+    <<: *app
+    command: [python, -m, app.pipeline.relay]
+    environment:
+      RELAY_DB_PASSWORD: ${RELAY_DB_PASSWORD:?set RELAY_DB_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
+      POSTGRES_HOST: db
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      RELAY_ID: relay-1
+      RELAY_METRICS_HOST: 0.0.0.0
+      RELAY_METRICS_PORT: 9108
+    ports:
+      - "127.0.0.1:${RELAY_METRICS_HOST_PORT:-9108}:9108"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+      schema-registry:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9108/metrics', timeout=3)"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+    stop_grace_period: 20s  # SIGTERM: finish the cycle, flush, exit
     restart: unless-stopped
 
 volumes:

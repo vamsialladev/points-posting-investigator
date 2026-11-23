@@ -5,7 +5,7 @@ from psycopg import sql
 
 from app.db.bootstrap import conninfo, grant_statements
 from app.db.migrate import TREES, alembic_config
-from app.db.roles import GRANTS, Database, loopback, runtime_url
+from app.db.roles import PASSWORD_VARIABLES, RUNTIME_ROLES, Database, loopback, runtime_url
 from app.ledger.schema import metadata as ledger_metadata
 from app.pipeline.tables import metadata as posting_metadata
 
@@ -50,29 +50,51 @@ def test_localhost_means_ipv4(host, expected):
     assert loopback(host) == expected
 
 
+def grants(base: str, suffix: str) -> dict[str, str]:
+    return next(role.grants for role in RUNTIME_ROLES[base] if role.suffix == suffix)
+
+
 def test_every_table_has_listed_rights_and_nothing_else_is_granted():
-    """A new table without a GRANTS entry would be unusable; a GRANTS entry without a table is a typo."""
+    """A new table nobody may use is a mistake; a grant on a table that doesn't exist is a typo."""
     for base, metadata in (("ledger", ledger_metadata), ("posting", posting_metadata)):
-        granted_tables = {obj.split(" ", 1)[1] for obj in GRANTS[base] if obj.startswith("TABLE ")}
-        assert granted_tables == set(metadata.tables), base
+        granted = {
+            obj.split(" ", 1)[1] for role in RUNTIME_ROLES[base] for obj in role.grants if obj.startswith("TABLE ")
+        }
+        assert granted == set(metadata.tables), base
 
 
 def test_the_ledger_runtime_role_can_never_update_or_delete():
-    rights = GRANTS["ledger"]["TABLE credits"]
-    assert rights == "SELECT, INSERT"
+    assert grants("ledger", "app")["TABLE credits"] == "SELECT, INSERT"
 
 
-def test_grants_are_revoke_then_grant_for_each_object():
+def test_the_posting_service_never_changes_an_outbox_row_and_the_relay_never_writes_one():
+    assert grants("posting", "app")["TABLE outbox"] == "SELECT, INSERT"  # ADR-0014: marking is the relay's job
+    relay = grants("posting", "relay")
+    assert set(relay) == {"TABLE outbox"}  # no access to the posting table at all
+    assert relay["TABLE outbox"].startswith("SELECT, UPDATE (") and "INSERT" not in relay["TABLE outbox"]
+    for column in ("payload", "topic", "message_key", "headers", "trace_context", "created_at"):
+        assert column not in relay["TABLE outbox"]
+
+
+def test_every_runtime_role_has_its_own_password_variable():
+    assert PASSWORD_VARIABLES == ("LEDGER_DB_PASSWORD", "POSTING_DB_PASSWORD", "RELAY_DB_PASSWORD")
+    assert Database("posting", "test_").role_name("relay") == "test_posting_relay"
+    with pytest.raises(ValueError):
+        Database("ledger").role_name("relay")
+
+
+def test_grants_are_revoke_then_grant_for_each_object_and_role():
     statements = grant_statements(Database("posting", "test_"))
     rendered = [s.as_string(None) for s in statements]
-    assert len(rendered) == 2 * len(GRANTS["posting"])
+    assert len(rendered) == 2 * sum(len(role.grants) for role in RUNTIME_ROLES["posting"])
     assert rendered[0] == 'REVOKE ALL ON TABLE "posting" FROM "test_posting_app"'
     assert rendered[1] == 'GRANT SELECT, INSERT ON TABLE "posting" TO "test_posting_app"'
+    assert rendered[-2] == 'REVOKE ALL ON TABLE "outbox" FROM "test_posting_relay"'
     assert all(isinstance(s, sql.Composed) for s in statements)
 
 
 def test_each_database_has_a_migration_tree_matching_its_tables():
-    assert set(TREES) == set(GRANTS)
+    assert set(TREES) == set(RUNTIME_ROLES)
     for base, (location, _) in TREES.items():
         assert (location / "env.py").exists() and list((location / "versions").glob("*.py")), base
 
