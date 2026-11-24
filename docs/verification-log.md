@@ -3,6 +3,22 @@
 Real results only, newest milestone first. Each row: what was checked, the exact command, and the result. Tool: Claude
 Code (Opus 5.5) did all of Milestone 1 and Milestone 2 so far.
 
+## Milestone 2, PR-B2a: the producer and the posting service (2026-11-23 to 2026-11-24)
+Plan approved by the owner as written (2026-11-23), with four changes to RFC-0001 (ADR-0015). Local stack only, $0,
+no AI. Stored results are in `docs/evidence/m2-pr-b2a-repeat-runs.md`, and `-before-refactor.md` beside it.
+
+| # | Check | Command | Result |
+|---|---|---|---|
+| 1 | State before starting | check runs on `263a8c0`; `git rev-parse` | push run 45103932370: all 5 checks succeeded; local `main` = `origin/main` = `263a8c0` |
+| 2 | Stack with the posting service | `scripts\stack.ps1 up` | all 8 services healthy (posting included) |
+| 3 | First real-stack run | `run_integration.py -k test_posting_kafka` | 9 passed, 1 failed. The end-to-end test gave two members the same stay IDs, so the second credit was **correctly refused** as a duplicate. That was test data, not code: each stay now gets its own ID. The rerun passed |
+| 4 | Every real-stack test | `scripts\run_integration.py` | **53 passed** (outage and both container smoke tests included) |
+| 5 | Repeat runs, batch 1 (before the refactor) | `repeat_tests.ps1 -Times 10`, 8 tests | 80/80 passed; kept as `m2-pr-b2a-repeat-runs-before-refactor.md` |
+| 6 | Offline coverage fell under the gate | `scripts\test.ps1` | **76.79% < 80%**. The service's decisions were tied to the database. Moved the SQL into `PostingStore`, made the producer's serializer injectable, and added offline tests. No gate was lowered. One new test had a wrong expected timestamp (2025 instead of 2026), which I fixed |
+| 7 | Offline checks, final code | `scripts\test.ps1` | **275 passed**, coverage **80.40%** |
+| 8 | Full local CI, final code | `scripts\ci_local.ps1` | **11/11 steps**; **53 real-stack tests** |
+| 9 | **Repeat runs on the final code** | `repeat_tests.ps1 -Times 10`, the same 8 tests | **10/10 each**: crash after the DB commit, DB failure mid-transaction, the same event twice, 8 concurrent copies, 8 concurrent resends under new event IDs, an undecodable event dead-lettered, a ledger outage retried in place, end to end with one trace ID |
+
 ## Milestone 2, PR-B1: the outbox relay (2026-11-22 to 2026-11-23)
 Plan approved by the owner as written (2026-11-22), with four changes to RFC-0001 (ADR-0014). Local stack only, $0,
 no AI. Stored results: `docs/evidence/m2-pr-b1-repeat-runs-first.md` and `docs/evidence/m2-pr-b1-repeat-runs-outage.md`.

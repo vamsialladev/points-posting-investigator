@@ -373,7 +373,63 @@ this decision. Updates are added as dated bullets; nothing is rewritten.
     hammering during an outage.
   - **One more local secret** (`RELAY_DB_PASSWORD`).
 - **Result:** verification log, M2 PR-B1. The tests run against real Postgres and Kafka. The crash and concurrency
-  tests were each run 10 times (`docs/evidence/m2-pr-b1-repeat-runs.md`). Found while building: Kafka advertised
-  `localhost`, so every new client spent 2 s on IPv6 first. It now advertises `127.0.0.1` (same cause as ADR-0012).
+  tests were each run 10 times (`docs/evidence/m2-pr-b1-repeat-runs-first.md`, `m2-pr-b1-repeat-runs-outage.md`).
+  Found while building: Kafka advertised `localhost`, so every new client spent 2 s on IPv6 first. It now advertises
+  `127.0.0.1` (same cause as ADR-0012).
 - **What would change this decision:** a hot member needing more than one message in flight (then partition-scoped
   leases, option 3), or a broker-side transactional producer if the outbox moved into Kafka itself.
+
+## ADR-0015: Posting service: one transaction for posting + outbox, offset after commit, the stay as the ledger key
+- **Context:** M2 PR-B2a builds the posting service. It must never post an event twice, whatever repeats, races or
+  crashes. Either both rows (posting and outbox) are written or neither, and an offset must never be committed for
+  work that didn't commit. The ledger is a separate system of record with its own database (spec B1.3; approved
+  2026-11-22), so it can't share a Postgres transaction with the posting service. The owner approved the B2 plan on
+  2026-11-23, with four changes to RFC-0001.
+- **Options considered:**
+  1. **Transaction boundary:**
+     - (a) A distributed transaction across the ledger and the posting database. Not available: the ledger is an
+       HTTP service.
+     - (b) Write posting + outbox first, then credit from a worker. That adds a second outbox (RFC-0001 D5).
+     - (c) Credit the ledger idempotently, then one transaction for posting + outbox.
+  2. **Offsets:**
+     - (a) Auto-commit. It can commit an offset before the database commits, which loses the event on a crash.
+     - (b) Commit before processing: at most once.
+     - (c) Commit synchronously, after the database commit: at least once.
+  3. **The ledger key:**
+     - (a) `event_id` (the RFC's D5)
+     - (b) the business key `stay_id:revision`
+- **Decision:** 1(c), 2(c), 3(b).
+  - **The single transaction:**
+    - `INSERT posting … ON CONFLICT DO NOTHING RETURNING`
+    - only if a row came back, `INSERT outbox` (with the trace context)
+    - a failure anywhere rolls both back
+  - **Offsets:**
+    - auto-commit and auto offset store are off
+    - after the transaction, the consumer commits exactly that message synchronously
+    - on a database failure, a dead-letter delivery failure, or (B2a only) a transient ledger failure, it commits
+      nothing, seeks back to the same message, and retries after a growing, jittered wait
+  - **Idempotency:**
+    - **event_id:** the posting row's primary key, and the consumer's first check
+    - **Ledger key `stay_id:revision`:** one credit per stay revision, whatever event ID it arrives under
+    - **The backstop:** `UNIQUE(stay_id, revision)` on the posting row
+  - **Dead letters:** an event that can never post goes to the DLQ topic, with its original bytes and RFC-0001 D8's
+    headers, and only then is its offset committed. That covers an event that is undecodable, has an unknown schema
+    version, has a bad field, is a correction (until PR-C), or gets a ledger 409 or other 4xx (until B2b counts
+    attempts).
+  - **Trace context:**
+    - the producer starts a W3C trace
+    - the posting service stores a child span on the outbox row
+    - the relay (ADR-0014) sends a child of that in the `points.posted` headers
+- **Tradeoff:**
+  - **The ledger is credited before the transaction,** so a crash in between leaves a credit with no posting row
+    until redelivery. Redelivery gets the same entry back (the key), then writes the rows. A credit without a
+    posting is the one state the ledger can be in temporarily; it never has two credits.
+  - **Seeking back blocks that partition** while the database (or, in B2a, the ledger) is down. Every member on the
+    partition waits. B2b parks ledger failures so only the affected member waits.
+  - **The business key means a genuinely new stay must have a new stay ID or revision.** That's the business rule
+    anyway.
+- **Result:** verification log, M2 PR-B2a; repeat runs in `docs/evidence/m2-pr-b2a-repeat-runs.md`. Building found
+  one test-data mistake: the same stay ID for two members. The service rightly refused the second credit, and the
+  test was fixed.
+- **What would change this decision:** a ledger that can join a transaction (unlikely for a system of record), or
+  corrections (PR-C) needing their own key rule (`stay_id:revision` already separates revisions).

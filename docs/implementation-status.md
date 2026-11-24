@@ -1,8 +1,8 @@
 # Implementation status
 
 - **Last updated:** 2026-11-23
-- **Current milestone:** 2 (in progress). PR-A merged; PR-B1 (the outbox relay) built and verified locally, PR open
-- **Next:** M2 PR-B2 (producer, posting service: one transaction for posting + outbox), then PR-C (retry topics, DLQ, corrections, load generator, schema gate)
+- **Current milestone:** 2 (in progress). PR-A, PR-B1 merged; PR-B2a (producer, posting service) built and verified locally, PR open
+- **Next:** M2 PR-B2b (parking table and retry worker: backoff, max attempts, per-member order under retries), then PR-C (corrections, load generator, schema gate, event-semantics doc)
 - **Waiting on the owner:** see `docs/session-handoff.md`
 
 ## Milestones
@@ -38,10 +38,10 @@ These are the only statuses used in `docs/requirements-matrix.md`:
 
 Plus `Planned (M#)` for a v1 requirement no milestone has reached, and `Planned (v2)` for "what's next".
 
-## Counts (from `docs/requirements-matrix.md`, 2026-11-23)
+## Counts (from `docs/requirements-matrix.md`, 2026-11-24)
 `tests/test_repo_guidance.py::test_status_counts_match_the_matrix` keeps this table honest.
 
 | Release | Rows | Implemented and verified | Manual step required | Planned |
 |---|---|---|---|---|
-| v1 | 142 | 37 | 0 | 105 |
+| v1 | 142 | 39 | 0 | 103 |
 | v2 | 32 | 0 | 0 | 32 |
