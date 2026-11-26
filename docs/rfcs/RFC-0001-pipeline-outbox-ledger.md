@@ -17,6 +17,21 @@ Everything here is a simulation with synthetic data. "Live" in this document mea
 
    Consumer-side retry topics stay in PR-C.
 
+## Changes approved by the owner on 2026-11-23 (plan for M2 PR-B2, ADR-0015, ADR-0016)
+1. **The ledger idempotency key is the business key, `stay_id:revision`**, not `event_id` (this changes D5). A stay
+   re-sent under a new event ID, at the same moment as the first one, can't be credited twice. `event_id` stays on
+   every event and stays the posting row's key.
+2. **Retries park the event in Postgres** (each member's oldest parked event first, as the relay does), replacing D8's
+   retry topics. Retry topics can't keep per-member order. Built in B2b.
+3. **Corrections (revision > 1) are dead-lettered as `unsupported_revision`** until PR-C builds D10.
+4. **A database failure isn't parked.** The consumer seeks back and retries, and that partition waits.
+5. **PR-B2 is split:**
+   - **B2a:** the producer and the posting service
+   - **B2b:** parking and the retry worker
+
+   In B2a, a transient ledger failure is retried in place (seek back), and a permanent one is dead-lettered at
+   once. B2b replaces both with parking, backoff and max attempts.
+
 ## Differences while building
 PR-A (the stack, the ledger mock, CI), 2026-11-17:
 1. **Karapace isn't the lighter image.** It is 1.72 GB. D3 had called Confluent's image "heavier", which I hadn't

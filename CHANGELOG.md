@@ -44,4 +44,18 @@ All notable changes to this project are documented here. The format follows
   - the `posting_relay` database role and the `RELAY_DB_PASSWORD` setting; `posting_app` no longer updates the outbox
   - the `relay` service in the core compose stack
   - `scripts\repeat_tests.ps1`: runs a test N times and stores the tally
+- Milestone 2, PR-B2a: the producer and the posting service (ADR-0015):
+  - `app/pipeline/producer.py`: synthetic `stay.checked_out` events with `event_id`, `schema_version`,
+    `correlation_id` and a W3C `traceparent` in the headers; keyed by member; idempotent producer
+  - `app/pipeline/events.py`: validation, 10 points per room-rate dollar, and the ledger business key
+    `stay_id:revision`
+  - `app/pipeline/ledger_client.py`: credits, with the 409, 401, 429, 5xx and 4xx outcomes classified, and status
+    lookups after a timeout
+  - `app/pipeline/posting.py`:
+    - one transaction for the posting row and its outbox row
+    - the Kafka offset committed only after that transaction
+    - seek-back retries
+    - dead letters with the original bytes and failure headers
+    - `/metrics`
+  - the `posting` service in the core compose stack
 - Kafka advertises `127.0.0.1` instead of `localhost`. The template uses `127.0.0.1` for Kafka and the registry.

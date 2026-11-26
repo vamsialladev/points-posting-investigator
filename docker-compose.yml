@@ -150,6 +150,37 @@ services:
       retries: 30
     restart: unless-stopped
 
+  posting:
+    <<: *app
+    command: [python, -m, app.pipeline.posting]
+    environment:
+      POSTING_DB_PASSWORD: ${POSTING_DB_PASSWORD:?set POSTING_DB_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
+      POSTGRES_HOST: db
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      LEDGER_API_URL: http://ledger:8020
+      LEDGER_API_TOKEN: ${LEDGER_API_TOKEN:?set LEDGER_API_TOKEN in .env}
+      POSTING_METRICS_HOST: 0.0.0.0
+      POSTING_METRICS_PORT: 9109
+    ports:
+      - "127.0.0.1:${POSTING_METRICS_HOST_PORT:-9109}:9109"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+      schema-registry:
+        condition: service_healthy
+      ledger:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9109/metrics', timeout=3)"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+    stop_grace_period: 20s  # SIGTERM: finish the message, commit its offset, close
+    restart: unless-stopped
+
   relay:
     <<: *app
     command: [python, -m, app.pipeline.relay]

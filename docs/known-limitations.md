@@ -65,5 +65,21 @@ Kept current at every milestone. Each line says what is limited, why, and what w
   in M4.
 - **librdkafka logs a connection failure every 2 s while Kafka is down.** It's noisy but expected; the relay itself
   logs one warning per failed cycle.
-- **The Kafka-outage test takes about 100 s.** CI runs it once; the 10-run tally is from the owner's machine
-  (`docs/evidence/m2-pr-b1-repeat-runs.md`).
+- **The Kafka-outage test takes about 100 s.** CI runs it once; the 10-run tallies are from the owner's machine
+  (`docs/evidence/m2-pr-b1-repeat-runs-first.md`, `docs/evidence/m2-pr-b1-repeat-runs-outage.md`).
+
+## Added in Milestone 2, PR-B2a: the producer and the posting service (2026-11-23)
+- **For a moment, the ledger can hold a credit with no posting row.** The ledger is credited before the posting
+  transaction (it's a separate system). A crash in between leaves the credit until the event is redelivered. The
+  retry gets the same entry back (the key is the stay) and writes the rows. It can never hold two credits.
+- **A transient ledger failure blocks its partition in B2a.** The consumer seeks back and retries the same message,
+  so every member on that partition waits. B2b parks the event instead, so only that member waits.
+- **A permanent ledger refusal (409, other 4xx) is dead-lettered at the first attempt in B2a.** B2b retries it with
+  backoff and dead-letters after the maximum attempts.
+- **Corrections (revision > 1) are dead-lettered as `unsupported_revision`** until PR-C builds the difference rule.
+- **Dead letters are at least once.** The DLQ message is published before the offset commit. A crash between the two
+  publishes it again; DLQ readers should dedupe on `event_id` plus the original offset.
+- **One posting service instance** runs in the stack. Two in one consumer group (a rebalance) aren't tested yet:
+  that's TEST-02, in PR-C.
+- **The stack's smoke tests leave rows behind** (member `GR-09998` / `GR-09999`) in the stack's own databases.
+  `scripts\stack.ps1 reset` clears them.
