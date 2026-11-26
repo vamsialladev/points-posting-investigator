@@ -1,48 +1,49 @@
 # Session handoff
 
-**Updated:** 2026-11-23. M2 PR-B1 (the outbox relay) is built and verified locally, and its PR is open. It merges
-only when all five required checks pass. `main` is protected (ADR-0013), and auto-merge waits for green.
+**Updated:** 2026-11-26. M2 PR-B2a (the producer and the posting service) is merged (#6, `42a4401`). B2b and PR-C
+remain. The B2b plan has been shown to the owner and waits for approval; no B2b code exists yet.
 
 ## Where things stand
 - **Milestone 1 is complete** and on `main` (https://github.com/vamsialladev/points-posting-investigator, public;
-  secret scanning and push protection on; `main` requires the five CI checks, admins included).
-- **Milestone 2 is in progress** (RFC-0001 and its approved changes, ADR-0010 and ADR-0014):
-  1. **PR-A, #3, merged:**
-     - the core stack (Kafka 4.4.0, Karapace 6.2.4, Postgres 16.15)
-     - the ledger mock
-     - roles and migrations
-     - CI
-  2. **PR-B1, this PR: the outbox relay.**
-     - several relays, each claiming every member's oldest open row (`FOR UPDATE SKIP LOCKED` plus a lease)
-     - at-least-once publishing with trace headers
-     - transient vs permanent failures, with dead-lettering after 5 permanent failures
-     - `/metrics`
-     - the `posting_relay` role
-  3. **PR-B2, next:** the producer and the posting service, with the posting row and outbox row in one transaction.
-  4. **PR-C:** retry topics and the DLQ after max attempts, corrections, the load generator and seeds, the schema
-     gate, `docs/event-semantics.md`.
-- **PR-B1 checks** (`docs/verification-log.md`, M2 PR-B1 #1–#16):
-  - 42 real-stack tests pass; 219 offline tests pass, at 80.74% coverage; local CI 11/11
-  - **Repeat runs:** 6 crash and concurrency tests passed 10/10 each
-  - **The Kafka-outage test** passed 9/10 in the first batch. Run 6 left no output to examine, and the runs were
-    slow because of a registry stall in the tests. After the test fixes it passed **10/10**, with 0 duplicates.
-- **Changes since the plan that affect you:**
-  - **One more local secret,** `RELAY_DB_PASSWORD`. I added it to your `.env` with `new_env.ps1 -AddMissing`. Nothing
-    was printed, and preflight is READY.
-  - **Kafka now advertises 127.0.0.1.** It used to cost every new client 2 s on IPv6.
-  - **Only permanent publish failures count toward dead-lettering,** so a Kafka outage can't dead-letter good
-    messages. The plan had said "after 5 failed publishes".
-- **The stack is running** on your machine (with the relay). Stop it with `scripts\stack.ps1 down`, which keeps the
-  data; `scripts\stack.ps1 reset` deletes it.
+  secret scanning and push protection on; `main` requires the five CI checks, admins included, ADR-0013).
+- **Milestone 2 is in progress** (RFC-0001 and its approved changes; ADR-0010, ADR-0014, ADR-0015):
+  1. **PR-A, #3, merged:** the core stack (Kafka 4.4.0, Karapace 6.2.4, Postgres 16.15), the ledger mock, roles and
+     migrations, CI.
+  2. **PR-B1, #5, merged:** the outbox relay. Several relays each claim every member's oldest open row; publishing
+     is at least once; permanent failures are dead-lettered; `/metrics`; the `posting_relay` role.
+  3. **PR-B2a, #6, merged 2026-11-26:**
+     - the producer (headers `event_id`, `schema_version`, `correlation_id`, `traceparent`; keyed by member)
+     - the posting service:
+       - credits the ledger under the business key `stay_id:revision`
+       - writes the posting row and its outbox row in **one transaction**
+       - commits the Kafka offset only after it
+       - seeks back on database, ledger or dead-letter-topic failures
+       - dead-letters events that can never post, with their original bytes
+     - the `posting` container
+  4. **PR-B2b, next (plan waiting for your OK):**
+     - the parking table and retry worker (backoff, max attempts, then the dead-letter topic)
+     - per-member order under retries
+     - the retry topics removed
+  5. **PR-C:** corrections (revision > 1), the load generator and seeds, the schema gate, `docs/event-semantics.md`.
+- **PR-B2a checks** (`docs/verification-log.md`, M2 PR-B2a #1–#9):
+  - 275 offline tests pass (80.40% coverage); 53 real-stack tests pass; local CI 11/11
+  - **Repeat runs on the final code:** 8 crash and concurrency tests passed 10/10 each
+    (`docs/evidence/m2-pr-b2a-repeat-runs.md`)
+  - PR #6's five CI checks passed before auto-merge
+- **What B2a still does that B2b changes:**
+  - a transient ledger failure is retried in place, so its partition waits
+  - a permanent ledger refusal (409, other 4xx) is dead-lettered at the first attempt
+- **The stack is stopped**, with its data kept. Start it with `scripts\stack.ps1 up`; stop it with
+  `scripts\stack.ps1 down`; `scripts\stack.ps1 reset` deletes the data.
 - **Secret deny rules at the project1 level** (ADR-0008, ADR-0009): `C:\projects\project1\.claude\settings.json`
   (outside every repo, not committed) holds 368 deny rules. Every `*.env` file is refused to Read, Edit and Write,
   and `.env.example` stays readable.
 - **Git identity:** every commit uses `339370878+vamsialladev@users.noreply.github.com`.
-- **No money spent.** Network use: Docker images (kafka 458 MB, karapace 1.72 GB, postgres 294 MB, python 119 MB, uv),
-  PyPI packages, the version lookups, and GitHub Actions (free on a public repo).
+- **No money spent.** Network use: Docker images, PyPI packages, the version lookups, and GitHub Actions (free on a
+  public repo).
 
 ## Waiting on the owner
-1. **Nothing blocks PR-B1.** It merges with a merge commit once its five checks pass (standing rule 6, ADR-0013).
+1. **Approve, or change, the B2b plan.** No B2b code until you do.
 2. **Your fresh-session canary test** is still pending on your side (verification log M1 #37).
 3. **Optional, on GitHub:** turn on Dependabot alerts, and "Block command line pushes that expose my email".
 
