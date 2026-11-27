@@ -433,3 +433,84 @@ this decision. Updates are added as dated bullets; nothing is rewritten.
   test was fixed.
 - **What would change this decision:** a ledger that can join a transaction (unlikely for a system of record), or
   corrections (PR-C) needing their own key rule (`stay_id:revision` already separates revisions).
+
+## ADR-0016: Retries park events in Postgres, oldest per member first; no retry topics
+- **Context:** in B2a, a transient ledger failure blocked its partition, because the consumer sought back to the same
+  message. A permanent refusal was dead-lettered at the first attempt. The owner asked for:
+  - retries with backoff, then dead-lettering after max attempts, without blocking the partition
+  - per-member order held under retries
+
+  RFC-0001 D8 planned retry topics. They don't keep order: while event 1 waits in a retry topic, event 2 of the same
+  member is processed. The owner approved the B2b plan on 2026-11-26.
+- **Options considered:**
+  1. Retry topics (D8). The partition isn't blocked, but per-member order is lost.
+  2. Seek back in place (B2a). Order is kept, but the whole partition is blocked.
+  3. Retry topics plus a "member is parked" marker that forces later events into the retry topic too. Order is
+     kept, but the marker and the topics have to agree across two systems.
+  4. A Postgres parking table:
+     - a failed event is parked
+     - later events of a member with open parked events are parked behind it
+     - a retry worker claims only each member's oldest open parked event, with `FOR UPDATE SKIP LOCKED` and a lease
+       (B1's relay pattern)
+- **Decision:** option 4.
+  - **The parking table, `parked_event`** (migration 0003):
+    - it keeps the original bytes, key and headers, and where the event came from
+    - its status is `pending`, `in_flight`, `done` or `dead`
+    - `attempts` counts permanent failures; `transient_failures` counts the rest
+    - there's a lease, with first and last failure times
+    - checks tie each status to its timestamp
+    - `posting_app` can't delete a parked event or rewrite its bytes
+  - **Failure kinds:**
+    - **Transient** (ledger 5xx, timeout, 429, 401): exponential backoff with jitter, never dead-lettered.
+    - **Permanent** (other 4xx): counted. At 5, the original bytes go to the DLQ topic, then the event is marked
+      `dead`.
+    - **A ledger 409, or undecodable bytes:** dead-lettered at once.
+  - **A worker success:** the posting row, its outbox row and the parked event's `done` commit in one transaction,
+    fenced on the worker's claim. A worker whose lease ran out rolls back.
+  - **The retry worker** runs as its own container (`retry-worker`).
+  - **The three `.retry.N` topics** are removed from the topic list.
+- **Tradeoff:**
+  - **The member waits behind its first failure.** One stuck event delays that member's later events, until it posts
+    or dies, by design. Other members never wait.
+  - **A transient failure never dead-letters,** so an event can wait forever during a long outage. It shows as the
+    oldest parked age; the alert on that is M4.
+  - **The parking table is one more table** to retain and watch.
+  - **An existing stack keeps the unused retry topics** until Kafka is recreated.
+- **Result:** verification log, M2 PR-B2b; repeat runs in `docs/evidence/m2-pr-b2b-repeat-runs.md`.
+- **What would change this decision:** a member's events needing to proceed independently (then parking per stay,
+  not per member), or a throughput need beyond one in-flight retry per member.
+
+## ADR-0017: The checkout producer reports every delivery failure; idempotent, gapless, bounded retries
+- **Context:** incident 2026-11-26 (`docs/incidents/2026-11-26-producer-silent-loss.md`).
+  - **The bug:** `CheckoutProducer.send()` attached no delivery callback, and `flush()` only counted queued messages.
+    A message Kafka refused or timed out was reported as sent.
+  - **What it caused:** under a degraded broker, a member's first event was lost while later ones arrived, because
+    librdkafka allows that gap by default. The later events posted ahead of the lost one.
+  - **How it was found:** B2b's repeat runs (two-workers run 3: 6 events posted, 4 never arrived).
+- **Options considered:**
+  1. Read delivery reports only.
+  2. Delivery reports plus idempotence and `acks=all`.
+  3. Option 2 plus `enable.gapless.guarantee` and a bounded `delivery.timeout.ms`.
+  4. Transactions: more than one topic doesn't need atomic writes here.
+- **Decision:** option 3.
+  - **Delivery reports:** every message gets a delivery callback. `send()` (and `flush()` for a batch) raises
+    `DeliveryFailed` for any event refused, timed out, with no report, or still queued, naming each one. It is never
+    a silent success.
+  - **Settings:** `enable.idempotence=true`, `acks=all`, `enable.gapless.guarantee=true`,
+    `max.in.flight.requests.per.connection=5`, `delivery.timeout.ms` (30 s by default).
+  - **The tests' producer uses the same settings.**
+- **Tradeoff:**
+  - **A fatal error leaves the producer unusable.** Gapless turns a possible gap into one, so the caller must build a
+    new producer.
+  - **Sending waits for acknowledgements from all in-sync replicas.** With one broker that costs little; with
+    replication it adds latency.
+  - **A failed send is now an exception** the caller must handle, which is the point.
+- **Result:** verification log, M2 PR-B2b.
+  - **Before the fix:** on the real stack, `send()` returned normally for a refused event.
+  - **After the fix:**
+    - unit and real-stack tests pass: a nonexistent topic → `UNKNOWN_TOPIC`; an unreachable broker →
+      `DeliveryFailed` after the delivery timeout
+    - with a fault proxy cutting acknowledgements, 0 duplicates and per-member order kept, while the non-idempotent
+      control showed 37 duplicates from the same fault
+- **What would change this decision:** writing several topics atomically (then transactions), or a producer that must
+  keep going after a fatal error (then recreate it automatically, with an alert).

@@ -72,10 +72,8 @@ Kept current at every milestone. Each line says what is limited, why, and what w
 - **For a moment, the ledger can hold a credit with no posting row.** The ledger is credited before the posting
   transaction (it's a separate system). A crash in between leaves the credit until the event is redelivered. The
   retry gets the same entry back (the key is the stay) and writes the rows. It can never hold two credits.
-- **A transient ledger failure blocks its partition in B2a.** The consumer seeks back and retries the same message,
-  so every member on that partition waits. B2b parks the event instead, so only that member waits.
-- **A permanent ledger refusal (409, other 4xx) is dead-lettered at the first attempt in B2a.** B2b retries it with
-  backoff and dead-letters after the maximum attempts.
+- **A database failure still blocks its partition.** Parking needs the database, so on a database failure the consumer
+  seeks back and retries the same message. Since B2b, every other failure parks instead (ADR-0016).
 - **Corrections (revision > 1) are dead-lettered as `unsupported_revision`** until PR-C builds the difference rule.
 - **Dead letters are at least once.** The DLQ message is published before the offset commit. A crash between the two
   publishes it again; DLQ readers should dedupe on `event_id` plus the original offset.
@@ -83,3 +81,16 @@ Kept current at every milestone. Each line says what is limited, why, and what w
   that's TEST-02, in PR-C.
 - **The stack's smoke tests leave rows behind** (member `GR-09998` / `GR-09999`) in the stack's own databases.
   `scripts\stack.ps1 reset` clears them.
+
+## Added in Milestone 2, PR-B2b: parking and the retry worker (2026-11-26)
+- **One stuck event holds back its member.** Later events of that member park behind it until it posts or is
+  dead-lettered. This keeps per-member order, by design (ADR-0016). Other members never wait.
+- **A transient failure never dead-letters.** During a long ledger outage an event can wait indefinitely; it shows as
+  `posting_parked_oldest_age_seconds`. The alert on it is M4.
+- **Parked and dead events stay in the table.** There's no retention job yet, and dead events are never replayed
+  automatically (replay is M7, with approval).
+- **The DLQ copy is published before the event is marked `dead`.** A crash between the two publishes it again on the
+  next attempt. DLQ readers should dedupe on `event_id` plus the original offset.
+- **A stack created before B2b keeps three unused `.retry.N` topics** until the Kafka container is recreated.
+- **Transient failures in the tests are injected** for chosen stays, in front of the real ledger client
+  (`FlakyLedger`). Permanent failures are real: a stay over the ledger's points limit gets the ledger's own 422.
