@@ -1,0 +1,42 @@
+# Alert rules as data (RFC-0002 Phase 2; the minimal version of OBS-05). Simulated system, synthetic data.
+# A rule fires when ALL of its conditions hold for one snapshot of signals (app/ops/alerts.py).
+# Deterministic Python evaluates these. No model reads or writes this file.
+# Signals (all counts or seconds; "window" is the snapshot's look-back, 30 s by default):
+#   posted_in_window, posted_in_previous_window, dead_lettered_in_window,
+#   consumer_lag, parked_open, parked_oldest_age_seconds,
+#   outbox_unpublished, outbox_oldest_age_seconds
+# Prometheus rules, dashboards and one runbook per alert are Milestone 4.
+version: 1
+rules:
+  - name: postings_dropped
+    owner: integration-on-call
+    summary: Postings stopped after a period with postings.
+    when:
+      - {signal: posted_in_previous_window, op: ">=", value: 5}
+      - {signal: posted_in_window, op: "==", value: 0}
+
+  - name: consumer_lag_high
+    owner: integration-on-call
+    summary: The posting group is behind on stay.checked_out.
+    when:
+      - {signal: consumer_lag, op: ">=", value: 10}
+
+  - name: parked_backlog
+    owner: integration-on-call
+    summary: Events have been parked for retry for a while.
+    when:
+      - {signal: parked_open, op: ">=", value: 1}
+      - {signal: parked_oldest_age_seconds, op: ">=", value: 10}
+
+  - name: dead_letters_growing
+    owner: integration-on-call
+    summary: Events were dead-lettered in the window.
+    when:
+      - {signal: dead_lettered_in_window, op: ">=", value: 1}
+
+  - name: outbox_backlog
+    owner: platform-on-call
+    summary: Postings are written but points.posted is not being published.
+    when:
+      - {signal: outbox_unpublished, op: ">=", value: 5}
+      - {signal: outbox_oldest_age_seconds, op: ">=", value: 10}
