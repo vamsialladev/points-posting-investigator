@@ -11,6 +11,9 @@ id_ed25519*
 secrets/
 .secrets/
 
+# Scenario run manifests (local evidence of what a trigger sent)
+.scenario-runs/
+
 # Python
 __pycache__/
 *.py[cod]

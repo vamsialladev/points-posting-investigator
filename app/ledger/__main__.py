@@ -12,6 +12,7 @@ Settings come from the environment (a local `.env` is loaded if present; nothing
 
 from __future__ import annotations
 
+import logging
 import os
 
 import uvicorn
@@ -22,10 +23,15 @@ from app.db.roles import Database, runtime_url
 from app.ledger.api import create_app
 from app.ledger.core import LedgerSettings
 from app.ledger.store import PostgresCreditStore
+from app.ops import logsink
 
 
 def main() -> None:
     load_dotenv(override=False)
+    logging.basicConfig(
+        level=os.environ.get("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(name)s %(message)s"
+    )
+    logsink.install("ledger")  # stored log lines for the investigator; off without OPS_DB_PASSWORD
     env = os.environ
     database = Database("ledger", env.get("DB_PREFIX", ""))
     url = runtime_url(

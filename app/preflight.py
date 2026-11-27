@@ -114,6 +114,7 @@ VARS: dict[str, Var] = {
         Var("LEDGER_DB_PASSWORD", _min_len(8), "at least 8 characters", secret=True),
         Var("POSTING_DB_PASSWORD", _min_len(8), "at least 8 characters", secret=True),
         Var("RELAY_DB_PASSWORD", _min_len(8), "at least 8 characters", secret=True),
+        Var("OPS_DB_PASSWORD", _min_len(8), "at least 8 characters", secret=True),
         # Kafka
         Var("KAFKA_BOOTSTRAP_SERVERS", _bootstrap_servers, "host:port[,host:port]"),
         Var("SCHEMA_REGISTRY_URL", _url("http", "https"), "an http(s) URL"),
@@ -169,6 +170,7 @@ _CORE = (
     "LEDGER_DB_PASSWORD",
     "POSTING_DB_PASSWORD",
     "RELAY_DB_PASSWORD",
+    "OPS_DB_PASSWORD",
     "KAFKA_BOOTSTRAP_SERVERS",
     "SCHEMA_REGISTRY_URL",
     "LEDGER_API_URL",
@@ -418,6 +420,7 @@ FEATURES: dict[str, tuple[str, ...]] = {
         "LEDGER_DB_PASSWORD",
         "POSTING_DB_PASSWORD",
         "RELAY_DB_PASSWORD",
+        "OPS_DB_PASSWORD",
         "KAFKA_BOOTSTRAP_SERVERS",
         "LEDGER_API_TOKEN",
     ),

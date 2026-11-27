@@ -29,6 +29,7 @@ FAKE = {
     "LEDGER_DB_PASSWORD": "fake-ledger-db-pw-3301",
     "POSTING_DB_PASSWORD": "fake-posting-db-pw-3302",
     "RELAY_DB_PASSWORD": "fake-relay-db-pw-3303",
+    "OPS_DB_PASSWORD": "fake-ops-db-pw-3304",
     "KAFKA_BOOTSTRAP_SERVERS": "localhost:9092",
     "SCHEMA_REGISTRY_URL": "http://localhost:8081",
     "LEDGER_API_URL": "http://localhost:8020",
@@ -137,6 +138,7 @@ def test_template_with_generated_local_values_is_ready_for_core(tmp_path):
         "LEDGER_DB_PASSWORD": "l" * 24,
         "POSTING_DB_PASSWORD": "o" * 24,
         "RELAY_DB_PASSWORD": "r" * 24,
+        "OPS_DB_PASSWORD": "p" * 24,
         "LEDGER_API_TOKEN": "t" * 24,
     }
     lines = []

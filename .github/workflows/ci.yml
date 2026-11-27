@@ -51,7 +51,7 @@ jobs:
       - run: uv sync --frozen
       - name: Throwaway local values for this run (masked)
         run: |
-          for name in POSTGRES_PASSWORD LEDGER_DB_PASSWORD POSTING_DB_PASSWORD RELAY_DB_PASSWORD LEDGER_API_TOKEN; do
+          for name in POSTGRES_PASSWORD LEDGER_DB_PASSWORD POSTING_DB_PASSWORD RELAY_DB_PASSWORD OPS_DB_PASSWORD LEDGER_API_TOKEN; do
             value="$(openssl rand -hex 24)"
             echo "::add-mask::$value"
             echo "$name=$value" >> "$GITHUB_ENV"
@@ -89,7 +89,7 @@ jobs:
       - name: Throwaway local values for this run (masked)
         run: |
           # Compose checks every service's required values, even when it starts only `db`.
-          for name in POSTGRES_PASSWORD LEDGER_DB_PASSWORD POSTING_DB_PASSWORD RELAY_DB_PASSWORD LEDGER_API_TOKEN; do
+          for name in POSTGRES_PASSWORD LEDGER_DB_PASSWORD POSTING_DB_PASSWORD RELAY_DB_PASSWORD OPS_DB_PASSWORD LEDGER_API_TOKEN; do
             value="$(openssl rand -hex 24)"
             echo "::add-mask::$value"
             echo "$name=$value" >> "$GITHUB_ENV"

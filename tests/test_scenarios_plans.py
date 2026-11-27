@@ -139,7 +139,7 @@ def test_affected_members_follow_each_scenarios_rule():
     assert {k: len(v) for k, v in affected("S11").items()} == {steps.CORRECTION_MISSING: 1}
     assert {k: len(v) for k, v in affected("S13").items()} == {steps.WRONG_DATES: 8}
     assert {k: len(v) for k, v in affected("S16").items()} == {steps.UNDECIDABLE: 1}
-    assert affected("S17") == affected("S05")
+    assert {k: len(v) for k, v in affected("S17").items()} == {steps.NOT_POSTED: 1}  # as S05, its own members
     assert {k: len(v) for k, v in affected("S15", "B").items()} == {steps.CORRECTION_MISSING: 1, steps.NOT_POSTED: 6}
     for effect in (i.effect for s, p in CASES for i in plans.plan(s, 0, p).manifest.affected):
         assert effect in steps.EFFECTS
@@ -209,9 +209,13 @@ def test_s16_sends_nothing_and_records_one_question():
 
 def test_s17_is_s05_with_the_three_planted_texts_and_the_reset_removes_the_runbook_line():
     base, poisoned = plans.plan("S05", 2), plans.plan("S17", 2)
-    assert [dataclasses.replace(e, event_id="", correlation_id="") for e in poisoned.manifest.events] == [
-        dataclasses.replace(e, event_id="", correlation_id="") for e in base.manifest.events
-    ]
+
+    def shape(events):  # everything but the identities: S17 has its own members, stays and event IDs
+        blank = {"event_id": "", "correlation_id": "", "member_number": "", "stay_id": ""}
+        return [dataclasses.replace(e, **blank) for e in events]
+
+    assert shape(poisoned.manifest.events) == shape(base.manifest.events)
+    assert [type(s) for s in poisoned.trigger[1:-1]] == [type(s) for s in base.trigger], "S05's steps, wrapped"
     assert [e.correlation_id for e in poisoned.manifest.events].count(catalog.INJECTION_CORRELATION_ID) == 1
     assert of_type(poisoned.trigger, steps.PlantLog)[0].message == catalog.INJECTION_LOG_MESSAGE
     planted = of_type(poisoned.trigger, steps.PlantRunbook)[0]
@@ -250,8 +254,29 @@ def test_runs_and_blocks_have_hard_edges():
     ):
         with pytest.raises(ValueError):
             bad()
-    assert plans.Block("S05", plans.MAX_RUN).stay(plans.STAYS_PER_RUN - 1) <= "ML-9999"
-    assert block.member(0) == "GR-30000" and block.stay(0) == "BR-0100" and block.stay(1) == "ML-0100"
+    last = plans.Block("S18", plans.MAX_RUN)  # the very last block still fits both ID shapes
+    assert last.stay(plans.STAYS_PER_RUN - 1) <= "ML-9999" and last.member(plans.MEMBERS_PER_RUN - 1) <= "GR-99999"
+    first = plans.Block("S01", 0)
+    assert first.member(0) == "GR-30000" and first.stay(0) == "BR-0100" and first.stay(1) == "ML-0100"
+    assert plans.Block("S02", 0).member(0) == "GR-30050" and plans.Block("S01", 1).stay(0) == "BR-0820"
+    assert len(catalog.SCENARIOS) == plans.SCENARIO_SLOTS
+
+
+def test_two_scenarios_in_the_same_run_share_no_member_or_stay():
+    """Found while writing the real-stack tests: blocks were per run only, so S01 and S05 of one run would have used
+    the same stays, and the ledger key is the stay."""
+    seen_members: dict[str, str] = {}
+    seen_stays: dict[str, str] = {}
+    for run in (0, plans.MAX_RUN):
+        for scenario, pair in CASES:
+            manifest = plans.plan(scenario, run, pair).manifest
+            name = f"{scenario}{pair or ''}-run{run}"
+            members = {e.member_number for e in manifest.events} | {a.member_number for a in manifest.affected}
+            stays = {e.stay_id for e in manifest.events} | {a.stay_id for a in manifest.affected if a.stay_id}
+            for value, seen in [(m, seen_members) for m in members] + [(s, seen_stays) for s in stays]:
+                owner = seen.setdefault(value, name)
+                # the two S15 pairs are alternatives of one scenario and share its block
+                assert owner == name or {owner[:3], name[:3]} == {"S15"}, f"{value}: {owner} and {name}"
 
 
 def test_the_command_lists_and_shows_plans_and_refuses_a_bad_request(capsys):

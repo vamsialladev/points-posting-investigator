@@ -22,12 +22,14 @@ from sqlalchemy.pool import NullPool
 
 from app.db.roles import CONNECT_TIMEOUT_SECONDS, RUNTIME_ROLES, Database, loopback
 from app.ledger.schema import metadata as ledger_metadata
+from app.ops.tables import metadata as ops_metadata
 from app.pipeline.tables import metadata as posting_metadata
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 TREES: dict[str, tuple[Path, MetaData]] = {
     "ledger": (ROOT / "migrations" / "ledger", ledger_metadata),
     "posting": (ROOT / "migrations" / "posting", posting_metadata),
+    "ops": (ROOT / "migrations" / "ops", ops_metadata),
 }
 
 

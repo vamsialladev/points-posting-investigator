@@ -42,9 +42,10 @@ from prometheus_client import CollectorRegistry, Counter, Gauge, generate_latest
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.ops import logsink
 from app.pipeline import trace
 from app.pipeline.events import CreditKind, InvalidEvent, ledger_key, plan_credit, validate
-from app.pipeline.ledger_client import LedgerPermanent, LedgerTransient
+from app.pipeline.ledger_client import LedgerPermanent, LedgerTransient, ledger_timeout
 from app.pipeline.posting import DatabaseFailure, DeadLetterFailure, IncomingMessage, LeaseLost
 from app.pipeline.relay import backoff_delay
 
@@ -406,6 +407,7 @@ def main() -> int:
     logging.basicConfig(
         level=os.environ.get("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(name)s %(message)s"
     )
+    logsink.install("retry-worker")  # stored log lines for the investigator; off without OPS_DB_PASSWORD
     env = os.environ
     engine = create_engine(
         runtime_url(
@@ -430,7 +432,11 @@ def main() -> int:
     worker = RetryWorker(
         ParkedStore(engine),
         PostingStore(engine),
-        LedgerClient(env.get("LEDGER_API_URL", "http://127.0.0.1:8020"), env.get("LEDGER_API_TOKEN", "")),
+        LedgerClient(
+            env.get("LEDGER_API_URL", "http://127.0.0.1:8020"),
+            env.get("LEDGER_API_TOKEN", ""),
+            timeout=ledger_timeout(env),
+        ),
         deserialize,
         DeadLetterPublisher(Producer({"bootstrap.servers": bootstrap, "acks": "all"}), topics.DLQ),
         RetryConfig(worker_id=env.get("RETRY_WORKER_ID", socket.gethostname())),

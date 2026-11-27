@@ -30,3 +30,6 @@ secrets:            ## scripts\secrets_scan.ps1
 
 ci:                 ## scripts\ci_local.ps1
 	pwsh -File scripts/ci_local.ps1
+
+scenario:           ## scripts\scenario.ps1 <list|plan|trigger|reset> [S05] (local stack only)
+	uv run python -m app.scenarios $(ARGS)
