@@ -34,9 +34,11 @@ services:
     healthcheck:
       # Over TCP: during first-start init the server listens on the socket only (Stage 9 lesson).
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 3s
       timeout: 3s
-      retries: 30
+      interval: 30s  # slow once healthy: each probe starts a process (Kafka: a JVM)
+      start_interval: 2s  # fast while starting, so `up --wait` is still quick
+      start_period: 120s
+      retries: 3
     # The entrypoint starts as root, fixes the data folder's owner, then drops to the postgres user.
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
@@ -70,10 +72,11 @@ services:
       - "127.0.0.1:19093:19093"  # the FAULTS listener, reached through the test proxy on 19092
     healthcheck:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:29092 > /dev/null 2>&1"]
-      interval: 5s
       timeout: 15s
-      retries: 30
-      start_period: 10s
+      interval: 30s  # slow once healthy: each probe starts a process (Kafka: a JVM)
+      start_interval: 2s  # fast while starting, so `up --wait` is still quick
+      start_period: 120s
+      retries: 3
     <<: *hardening
 
   schema-registry:
@@ -100,10 +103,11 @@ services:
       - "127.0.0.1:${SCHEMA_REGISTRY_HOST_PORT:-8081}:8081"
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/subjects', timeout=3)"]
-      interval: 5s
       timeout: 5s
-      retries: 30
-      start_period: 10s
+      interval: 30s  # slow once healthy: each probe starts a process (Kafka: a JVM)
+      start_interval: 2s  # fast while starting, so `up --wait` is still quick
+      start_period: 120s
+      retries: 3
     <<: *hardening
 
   db-init:
@@ -148,9 +152,11 @@ services:
         condition: service_completed_successfully  # the stack is "up" only once the topics exist
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8020/readyz', timeout=3)"]
-      interval: 3s
       timeout: 5s
-      retries: 30
+      interval: 30s  # slow once healthy: each probe starts a process (Kafka: a JVM)
+      start_interval: 2s  # fast while starting, so `up --wait` is still quick
+      start_period: 120s
+      retries: 3
     restart: unless-stopped
 
   posting:
@@ -178,9 +184,11 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9109/metrics', timeout=3)"]
-      interval: 3s
       timeout: 5s
-      retries: 30
+      interval: 30s  # slow once healthy: each probe starts a process (Kafka: a JVM)
+      start_interval: 2s  # fast while starting, so `up --wait` is still quick
+      start_period: 120s
+      retries: 3
     stop_grace_period: 20s  # SIGTERM: finish the message, commit its offset, close
     restart: unless-stopped
 
@@ -210,9 +218,11 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9110/metrics', timeout=3)"]
-      interval: 3s
       timeout: 5s
-      retries: 30
+      interval: 30s  # slow once healthy: each probe starts a process (Kafka: a JVM)
+      start_interval: 2s  # fast while starting, so `up --wait` is still quick
+      start_period: 120s
+      retries: 3
     stop_grace_period: 20s  # SIGTERM: finish the cycle, then exit
     restart: unless-stopped
 
@@ -238,9 +248,11 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9108/metrics', timeout=3)"]
-      interval: 3s
       timeout: 5s
-      retries: 30
+      interval: 30s  # slow once healthy: each probe starts a process (Kafka: a JVM)
+      start_interval: 2s  # fast while starting, so `up --wait` is still quick
+      start_period: 120s
+      retries: 3
     stop_grace_period: 20s  # SIGTERM: finish the cycle, flush, exit
     restart: unless-stopped
 
