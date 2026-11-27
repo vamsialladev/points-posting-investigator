@@ -97,6 +97,14 @@ All notable changes to this project are documented here. The format follows
     `python -m app.scenarios list|plan`. The executor that runs them comes next
   - `app/ops/lag.py`: consumer lag from committed offsets and watermarks, with a read-only reader
   - `ops/alert-rules.yaml` and `app/ops/alerts.py`: alert rules as data and a deterministic evaluator
+- Milestone 3, Phase 2, the evidence store and the executor (RFC-0002):
+  - the `ops` database: stored log lines, the change feed, member questions, alert evaluations and runbook text,
+    with an insert-only role for the services (`OPS_DB_PASSWORD`)
+  - `app/ops/logsink.py`: a log handler that stores lines and never raises into the service; off without the
+    password
+  - `python -m app.scenarios trigger|reset` and `scripts\scenario.ps1`, local stack only, with a manifest per run
+    in `.scenario-runs/`
+  - `LEDGER_TIMEOUT_SECONDS` on the posting service and the retry worker (5 s by default)
 
 ### Changed
 - CI's `checks` job fetches the full history, so the pre-registration order test can read it.

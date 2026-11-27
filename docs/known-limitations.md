@@ -120,6 +120,14 @@ Kept current at every milestone. Each line says what is limited, why, and what w
 - **The order test needs full git history.** It fails on a shallow clone, by design; CI's `checks` job now fetches
   everything.
 - **The ledger `members` table moves to v2** (ADR-0019): no pre-registered scenario needs an unknown member.
+- **Twelve of the 18 scenarios have not run on a real stack yet** (S03, S04, S06 to S10, S12, S14, S15, S17, S18).
+  Their plans and side effects are tested with fakes only. CI runs the other six.
+- **Stored logs are the minimal version.** Lines are cut at 500 characters and carry IDs only where the service
+  passes them; today's services mostly log plain messages. A redaction filter and trace IDs on every line are M4.
+- **A scenario's planted log line is written by the trigger, not by a service.** It is labelled as coming from the
+  posting service because S17 tests text that looks like a real log line.
+- **Stored logs can be lost.** A full queue or a database failure drops lines (counted, not raised), by design.
+- **Runs are limited to 0 to 12 per scenario** (234 scenario runs), by the BR-/ML-#### stay ID shape.
 - **A 10/10 local repeat run didn't catch a timing race** that a faster CI runner hit (verification log M3 #7). The
   M2 repeat runs show stability on the owner's machine, not on every machine.
 - **The predictions are the builder's.** Which scenarios the rules handle alone (9 of 18) was written by Claude Code

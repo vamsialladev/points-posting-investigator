@@ -6,7 +6,7 @@ complete. The owner's "Milestone 3" (a read-only AI investigator plus human-appr
 
 ## Start of the next session
 1. Read `CLAUDE.md`, `docs/implementation-status.md`, this file, **RFC-0002** and `docs/failure-catalog.md`.
-2. Run `scripts\test.ps1`: it should give **495 passed, 68 skipped**, coverage 84.71% (plus 2 once PR #12 is merged in).
+2. Run `scripts\test.ps1`: it should give **570 passed, 91 skipped**, coverage 83.46% (after PR #14).
 3. Continue with the first phase below that isn't done. The plan is approved: no new approval is needed for a
    phase, only for what "Standing orders" lists.
 
@@ -42,13 +42,15 @@ complete. The owner's "Milestone 3" (a read-only AI investigator plus human-appr
 ## Phase 2, piece by piece
 | Piece | State |
 |---|---|
-| Plans for all 18 scenarios as pure data (`app/scenarios/`: `catalog.py`, `steps.py`, `plans.py`); `python -m app.scenarios list` and `plan <id> [--run N] [--pair A]` | done, offline-tested (`908e5ba`). Each run owns 50 members (GR-30000 up) and 80 stays (BR/ML-0100 up), so nothing is deleted between runs |
-| Lag calculation and a read-only reader (`app/ops/lag.py`); alert rules (`ops/alert-rules.yaml`) and evaluator (`app/ops/alerts.py`) | done, offline-tested (`36212aa`). The reader isn't yet run against real Kafka |
-| The `ops` database: `log_event`, `change_event`, `member_question`, `alert_evaluation`, `runbook_section`, with an insert-only writer role; a log handler in each service | **not started**. Adds a database password to `.env` (`scripts
-ew_env.ps1 -AddMissing`): ask the owner first |
-| The executor that runs a plan against the stack (`trigger`, `reset`, the manifest in `.scenario-runs/`), `scripts\scenario.ps1`, a `LEDGER_TIMEOUT_SECONDS` setting on the posting service and retry worker (S12), a signal snapshot for the alert evaluator | **not started** |
-| Kafka SASL and ACLs, in its own PR | **not started**. Adds Kafka passwords to `.env`; the 68 real-stack tests must pass before merge |
-| The real-stack batch: every scenario triggers and resets | **not started**. Quiet check and the owner's OK first |
+| Plans for all 18 scenarios as pure data (`app/scenarios/`: `catalog.py`, `steps.py`, `plans.py`); `python -m app.scenarios list` and `plan <id> [--run N] [--pair A]` | done, merged (PR #13). Every (scenario, run) owns 50 members (GR-30000 up) and 80 stays (BR/ML-0100 up); runs 0 to 12 |
+| Lag calculation and a read-only reader (`app/ops/lag.py`); alert rules (`ops/alert-rules.yaml`) and evaluator (`app/ops/alerts.py`) | done, merged (PR #13) |
+| The `ops` database (`app/ops/tables.py`, `migrations/ops/`): `log_event`, `change_event`, `member_question`, `alert_evaluation`, `runbook_section`; the insert-only role `ops_app`; the log handler `app/ops/logsink.py`, installed by the four services | built, PR #14. `OPS_DB_PASSWORD` is in the owner's `.env` (added 2026-11-27 with `new_env.ps1 -AddMissing`; preflight `core` READY) |
+| The executor (`executor.py`), the local-stack adapter (`stack.py`, `kafka_io.py`), `trigger` and `reset` with a manifest in `.scenario-runs/` (`run.py`), `scripts\scenario.ps1`, `LEDGER_TIMEOUT_SECONDS` | built, PR #14. Real-stack tests for S01, S02, S05, S11, S13, S16 run in CI (`tests/test_scenarios_real.py`) |
+| The other 12 scenarios on a real stack (S03, S04, S06 to S10, S12, S14, S15, S17, S18) | **not run yet**. This is the batch on the owner's machine: quiet check and the owner's OK first. Expect fixes: none of their side effects has met a real broker yet |
+| Kafka SASL and ACLs, in its own PR | **not started**. Adds Kafka passwords to `.env` (already approved); the real-stack tests must pass before merge |
+
+**The stack on this machine was created before the `ops` database existed.** The next `scripts\stack.ps1 up`
+rebuilds the image and `db-init` creates and migrates `ops`; no data is deleted.
 
 ## Design notes for Phase 2
 - **S07** takes the posting role's login away instead of pausing Postgres, so the ledger's database stays up.
@@ -56,6 +58,10 @@ ew_env.ps1 -AddMissing`): ask the owner first |
   timeout would post the parked events at once), and writes the change record first.
 - **S03 takes about a minute to trigger:** each timed-out event costs the single-threaded consumer about 16 s (a 5 s
   timeout, two 5 s lookups, the settle time).
+- **Test runs use the top run numbers** (12 down to 6) and pick the first one that left nothing on the stack; demo
+  runs count up from 0. When all are used, `scripts\stack.ps1 reset` clears them: that deletes data, so ask first.
+- **The adapter never writes a posting, outbox row, parked event or credit.** It writes only the scenario's own
+  evidence rows in `ops`, and the reset deletes only the runbook line its trigger planted (by tag).
 - **A CI-only timing race was found and fixed** (PR #12): tests that need the retry worker to reach a fault point
   must use `first_claim(worker)`, never a single `run_once()` straight after parking.
 - **Replay (Phase 5):** the posting service reports an already-parked event ID as a duplicate, so a dead parked
