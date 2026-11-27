@@ -1,8 +1,8 @@
 # Implementation status
 
 - **Last updated:** 2026-11-27
-- **Current milestone:** 2 (in progress). PR-A, PR-B1, PR-B2a merged; PR-B2b (parking, retry worker, producer silent-loss fix) built and committed on `m2/parking-retry`, waiting for the 10x repeat batch on a quiet machine before its PR
-- **Next:** B2b's 10x batch, PR and CI; then PR-C (corrections, load generator, schema gate, event-semantics doc)
+- **Current milestone:** 2, complete when PR-C (#9) merges. PR-A (#3), PR-B1 (#5), PR-B2a (#6) and PR-B2b (#8) are merged
+- **Next:** Milestone 3 (catalog, hypotheses, thresholds, pre-registration): design-heavy, so the plan comes first
 - **Waiting on the owner:** see `docs/session-handoff.md`
 
 ## Milestones
