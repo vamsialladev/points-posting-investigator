@@ -553,3 +553,46 @@ this decision. Updates are added as dated bullets; nothing is rewritten.
 - **Result:** verification log, M2 PR-C.
 - **What would change this decision:** corrections often arriving before originals (then let an original overtake a
   waiting correction of its own stay), or nested schemas (then a real compatibility library for the local check).
+
+## ADR-0019: Adopt RFC-0002: pre-registration, scenarios, the read-only investigator and approved replay as one program
+- **Context:** the owner asked for "Milestone 3: a read-only AI incident investigator plus human-approved replay
+  without double-posting" (2026-11-27). In the spec that is three milestones: M3 (pre-registration, triggers), M6
+  (the investigator) and M7 (recovery). Four scenarios also need evidence that only M4 was going to build.
+- **Options considered:**
+  - **Numbering:**
+    1. Renumber the repo so the investigator is M3.
+    2. Keep the spec's numbers and run the request as phases across M3, M6 and M7.
+  - **M4 gaps (lag, "what changed", stored logs, alert rules):**
+    1. Wait for M4, leaving scenarios S09, S12, S17 and S18 without evidence.
+    2. Build a minimal version of each now; leave Prometheus, Grafana, Tempo and the Collector in M4.
+  - **Kafka access for the investigator:**
+    1. A code-level check only.
+    2. SASL and the standard authorizer in the local stack, with a read-only principal.
+  - **The ledger `members` table** (deferred to M3 by ADR-0018):
+    1. Build it now.
+    2. Move it to v2: none of the 18 scenarios needs an unknown-member failure.
+  - **Freezing the pre-registration:**
+    1. Git order only.
+    2. Git order plus a lock file of SHA-256 hashes, so any later edit is a visible commit.
+- **Decision:** option 2 in each case. Approved by the owner on 2026-11-27, with three additions:
+  - the plan states explicitly that the investigator can never write, replay or post; that a replay needs a
+    person's approval bound to the exact events; and that tests prove a replay can't double-post (RFC-0002, "The
+    three guarantees")
+  - one live run is pre-approved (Claude Haiku 5.5, the 18 dev scenarios, 3 runs each, plus the injection cases)
+    with a hard cap of $3; the price is re-checked on the official pricing page and the estimate confirmed with the
+    owner before the run
+  - real-stack batches in Phases 2, 4 and 5 start only after the quiet check and the owner's OK
+- **Tradeoff:**
+  - **The request spans three spec milestones,** so the status table shows M3, M6 and M7 moving together, and
+    arms A and B in full (M5) and the 60-incident benchmark (M9) still come later.
+  - **The minimal M4 pieces are not M4:** no dashboards, no Prometheus rules, no trace backend yet.
+  - **SASL changes how every service connects** and adds local-only passwords. It is plaintext SASL on loopback,
+    labelled dev-only.
+  - **Approval has no real sign-in** until M8: local principals through a CLI and an API.
+  - **The lock file can still change until the first arm or investigator commit.** That is on purpose: a trigger
+    may show a catalog entry to be wrong. Every change is a visible commit; after that point only dated amendments
+    that never change a ground truth.
+- **Result:** RFC-0002; `tests/test_preregistration.py`; verification log, M3 sections.
+- **What would change this decision:** a scenario that needs an unknown member (then the `members` table comes
+  back); SASL proving unreliable on Docker Desktop (then a documented code-level check, with the owner's OK); the
+  owner wanting the web approval screen before replay (then M8's sign-in moves ahead of Phase 5).

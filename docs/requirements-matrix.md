@@ -68,7 +68,7 @@ Every requirement in `docs/MASTER-SPEC.md` has one row, plus the owner's standin
 
 | ID | Requirement | Spec | Tier | Release | M | Implementation | Evidence | Status |
 |---|---|---|---|---|---|---|---|---|
-| FAIL-00 | `docs/failure-catalog.md` committed before any arm or investigator code; each scenario has trigger, expected behaviour, ground truth, evidence, recovery, affected members, reset | C | 1 | v1 | 3 | – | – | Planned (M3) |
+| FAIL-00 | `docs/failure-catalog.md` committed before any arm or investigator code; each scenario has trigger, expected behaviour, ground truth, evidence, recovery, affected members, reset | C | 1 | v1 | 3 | `docs/failure-catalog.md` (18 scenarios, closed root-cause and recovery codes), `benchmarks/preregistration.lock.json`, `scripts/prereg_lock.py`, RFC-0002, ADR-0019. The trigger and reset commands it names are built in Phase 2 (FAIL-01 to FAIL-18) | `docs/verification-log.md` M3 Phase 1; `tests/test_preregistration.py::test_preregistration_is_committed_before_any_arm_or_investigator_code`; `tests/test_preregistration.py::test_the_catalog_has_all_18_scenarios_with_every_field`; `tests/test_preregistration.py::test_every_scenario_uses_only_the_closed_code_lists`; `tests/test_preregistration.py::test_order_fails_when_the_code_came_first` | Implemented and verified |
 | FAIL-01 | Invalid event schema (breaking producer change) | C | 1 | v1 | 3 | – | – | Planned (M3) |
 | FAIL-02 | Duplicate event delivery | C | 1 | v1 | 3 | – | – | Planned (M3) |
 | FAIL-03 | Ledger timeout | C | 1 | v1 | 3 | – | – | Planned (M3) |
@@ -159,7 +159,7 @@ Every requirement in `docs/MASTER-SPEC.md` has one row, plus the owner's standin
 | BENCH-04 | Arm C: B's evidence plus the AI investigator | H1 | 1 | v1 | 9 | – | – | Planned (M9) |
 | BENCH-05 | At least 60 labelled incidents from the Part C scenarios, with varied timing, noise and compound cases | H2 | 1 | v1 | 9 | – | – | Planned (M9) |
 | BENCH-06 | Dev / validation / held-out / stress splits grouped against leakage; ground truth from scenarios; versions and checksums | H2 | 1 | v1 | 9 | – | – | Planned (M9) |
-| BENCH-07 | `benchmarks/thresholds.yaml` and `docs/hypotheses.md` committed before any arm or investigator code (moved to M3, ADR-0002) | H3 | 1 | v1 | 3 | – | – | Planned (M3) |
+| BENCH-07 | `benchmarks/thresholds.yaml` and `docs/hypotheses.md` committed before any arm or investigator code (moved to M3, ADR-0002) | H3 | 1 | v1 | 3 | `benchmarks/thresholds.yaml`, `docs/hypotheses.md` (H1 to H5, three verdicts), `docs/benchmark-protocol.md` (metrics with denominators, splits, scoring rubric), `benchmarks/preregistration.lock.json` | `docs/verification-log.md` M3 Phase 1; `tests/test_preregistration.py::test_thresholds_yaml_equals_the_table_in_the_hypotheses`; `tests/test_preregistration.py::test_the_lock_matches_every_preregistered_file`; `tests/test_preregistration.py::test_a_shallow_clone_fails_instead_of_passing` | Implemented and verified |
 | BENCH-08 | Metrics with counts and denominators: top-1/top-3 root cause, citations, abstention, coverage, wrong recovery proposals, time to diagnosis and recovery, affected members, tool calls, tokens and cost | H4 | 1 | v1 | 9 | – | – | Planned (M9) |
 | BENCH-09 | Per-scenario breakdown, where B beats or equals C, uncertainty estimates where justified | H4 | 1 | v1 | 9 | – | – | Planned (M9) |
 | BENCH-10 | `make bench ARM=… SPLIT=… PROVIDER=… BUDGET=…` (plus a `.ps1` twin) and a compare command | H5 | 1 | v1 | 9 | – | – | Planned (M9) |

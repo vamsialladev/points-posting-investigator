@@ -1,16 +1,17 @@
 # Implementation status
 
 - **Last updated:** 2026-11-27
-- **Current milestone:** 2 complete (2026-11-27): PR-A (#3), PR-B1 (#5), PR-B2a (#6), PR-B2b (#8), PR-C (#9), all merged with green CI. M3 not started
-- **Next:** Milestone 3 (catalog, hypotheses, thresholds, pre-registration): design-heavy, so the plan comes first
+- **Current milestone:** 3, under RFC-0002 (approved 2026-11-27), which runs M3, M6 and M7 as phases. Phase 1 done:
+  the pre-registration is committed before any arm or investigator code. M2 complete (2026-11-27)
+- **Next:** RFC-0002 Phase 2: a trigger and a reset for each of the 18 scenarios, four minimal M4 pieces, Kafka ACLs
 - **Waiting on the owner:** see `docs/session-handoff.md`
 
 ## Milestones
 | M | Name | Release | Status |
 |---|---|---|---|
 | 1 | Workspace, continuity, tracking, preflight, discovery | v1 | Implemented and verified |
-| 2 | Kafka, schema registry, Postgres, pipeline, outbox, idempotent ledger | v1 | Planned (M2) |
-| 3 | Pre-registration (catalog, hypotheses, thresholds, protocol), scenario triggers and resets | v1 | Planned (M3) |
+| 2 | Kafka, schema registry, Postgres, pipeline, outbox, idempotent ledger | v1 | Implemented and verified |
+| 3 | Pre-registration (catalog, hypotheses, thresholds, protocol), scenario triggers and resets | v1 | Pre-registration: Implemented and verified. Triggers and resets: Planned (M3) |
 | 4 | Observability, dashboards, alert rules, change feed, runbooks | v1 | Planned (M4) |
 | 5 | Arms A and B | v1 | Planned (M5) |
 | 6 | AI investigator (arm C) on the mock provider | v1 | Planned (M6) |
@@ -43,5 +44,5 @@ Plus `Planned (M#)` for a v1 requirement no milestone has reached, and `Planned 
 
 | Release | Rows | Implemented and verified | Manual step required | Planned |
 |---|---|---|---|---|
-| v1 | 142 | 44 | 0 | 98 |
+| v1 | 142 | 46 | 0 | 96 |
 | v2 | 32 | 0 | 0 | 32 |

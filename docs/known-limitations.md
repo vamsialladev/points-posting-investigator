@@ -106,3 +106,21 @@ Kept current at every milestone. Each line says what is limited, why, and what w
 - **The ledger `members` table is deferred to M3** (ADR-0018, owner confirmed). The ledger doesn't validate members.
 - **PR-C's real-stack tests** (corrections, original_missing, the skipped-event role, the rebalance) waited for a free
   machine; their results are in the verification log once run.
+
+## Added in Milestone 3, Phase 1: the pre-registration (2026-11-27)
+- **The catalog names commands that don't exist yet.** `python -m app.scenarios trigger|reset` is built in Phase 2 of
+  RFC-0002. Until then FAIL-01 to FAIL-18 stay `Planned (M3)`.
+- **The catalog can still change until the first arm or investigator commit.** A trigger may show an entry's
+  evidence to be wrong. Each change must update the lock file, so it is a visible commit. After that point only
+  dated amendments that never change a ground truth.
+- **The evidence lines for S03 and S12 name `ledger_timeout_not_found`** from reading the code. The first real
+  trigger run confirms the class or corrects the entry.
+- **The thresholds are judgment, made before any arm ran.** A threshold that proves badly chosen is reported next to
+  the result it produced, not changed.
+- **The order test needs full git history.** It fails on a shallow clone, by design; CI's `checks` job now fetches
+  everything.
+- **The ledger `members` table moves to v2** (ADR-0019): no pre-registered scenario needs an unknown member.
+- **A 10/10 local repeat run didn't catch a timing race** that a faster CI runner hit (verification log M3 #7). The
+  M2 repeat runs show stability on the owner's machine, not on every machine.
+- **The predictions are the builder's.** Which scenarios the rules handle alone (9 of 18) was written by Claude Code
+  from the M2 code, with nobody else reviewing it.

@@ -1,18 +1,57 @@
 # Session handoff
 
-**Updated:** 2026-11-27. **Milestone 2 is complete.** `main` is at `e6c2e2c` (PR-C, #9), and CI on `main` is green
-for both M2 merges (#8 `41c02e3`, #9 `e6c2e2c`). **Next: Milestone 3**, planned in a fresh session. M3 is
-design-heavy (rule 2): show the plan with the approval checklist at the top, and wait for the owner's OK before any
-code.
+**Updated:** 2026-11-27. **RFC-0002 is approved and its Phase 1 (the pre-registration) is done.** Milestone 2 is
+complete. The owner's "Milestone 3" (a read-only AI investigator plus human-approved replay) runs as the phases of
+`docs/rfcs/RFC-0002-investigator-and-approved-replay.md` across spec M3, M6 and M7 (ADR-0019).
 
-## Start of the next session (M3 planning)
-1. Read `CLAUDE.md`, `docs/implementation-status.md`, this file, and the spec's **Part C** (the 18 scenarios),
-   **H3** (pre-registered thresholds and hypotheses) and **Part P** row 3 ("every scenario triggers and resets
-   deterministically").
-2. Run `scripts\test.ps1`: it should give **358 passed**, coverage 81.69%.
-3. Write the M3 plan (below), and wait for the owner's OK.
+## Start of the next session
+1. Read `CLAUDE.md`, `docs/implementation-status.md`, this file, **RFC-0002** and `docs/failure-catalog.md`.
+2. Run `scripts\test.ps1`: it should give **373 passed, 68 skipped**, coverage 81.69%.
+3. Continue with the first phase below that isn't done. The plan is approved: no new approval is needed for a
+   phase, only for what "Standing orders" lists.
 
-## What M3 must deliver (from `docs/implementation-plan.md`, row 3)
+## Standing orders from the owner (2026-11-27, for the RFC-0002 program)
+- Decide routine engineering choices and record them in an ADR. Batch questions: at most 3, each with a
+  recommended answer, only when blocked.
+- Small PRs, CI first, auto-merge on green. Wait for the owner only if a check fails or the change touches money,
+  secrets, hosting or public content.
+- **Always ask before:** paid model spend, publishing, deleting data, weakening a test or gate.
+- **Machine sharing:** other sessions use this laptop (Stage 9's M13 paid Phase 3, then Stage 11's benchmark chain).
+  Before every real-stack batch in Phases 2, 4 and 5: `scripts\quiet_check.ps1 -Minutes 5`, then **ask the owner**.
+  Use scratch topics for probes. Bring the stack down afterwards and keep the data. Offline and unit work can go on
+  at any time. Work only in this repo's folder.
+- **The live run (Phase 7)** is pre-approved with a hard cap of **$3**. Before it: re-check Haiku 5.5's price on
+  Anthropic's official pricing page, redo the estimate, and show it to the owner.
+- Report each phase end in at most 5 lines: done, pass counts, cost, next, what the owner must do.
+
+## RFC-0002 phases
+| Phase | Content | State |
+|---|---|---|
+| 0 | RFC-0002, ADR-0019 | done (`49dc098`) |
+| 1 | Pre-registration: catalog, hypotheses, thresholds, protocol, lock, order test | done (`4828940`); 373 offline tests pass |
+| 2 | Trigger and reset for all 18 scenarios (`python -m app.scenarios`); `log_event`, `change_event`, the lag reader, alert rules as YAML; Kafka SASL and ACLs | **next**. Offline parts first; the real-stack batch needs the quiet check and the owner's OK |
+| 3 | Minimal rules baseline (`app/arms/`) | not started. **The first commit here freezes the pre-registration** |
+| 4 | Investigator (`app/investigator/`): tools, loop, citations, mock and hostile-mock providers, audit, GenAI spans | not started |
+| 5 | Proposal, approval bound to the message-set hash, replay through the idempotent path | not started |
+| 6 | Mock evaluation of the 18 dev scenarios, evidence, teaching notes | not started |
+| 7 | One live run, cap $3 | not started; see "Standing orders" |
+
+**Before Phase 3's first commit,** any correction to a pre-registered file needs
+`uv run python scripts/prereg_lock.py --write` in the same commit. After it, those files don't change.
+
+## Design notes for Phase 2 (decided, not yet built)
+- **Triggers** use the knobs in the table below, write a manifest to `.scenario-runs/` (git-ignored), and take
+  `--seed`. S07 takes the posting role's login away instead of pausing Postgres, so the ledger's database stays up.
+- **S12** needs a ledger-timeout setting on the posting service (the client's `timeout` is a constructor argument,
+  5.0 s by default, with no environment variable yet).
+- **S13** needs a clock offset in the load generator (`occurred_at`).
+- **Replay (Phase 5):** the posting service reports an already-parked event ID as a duplicate, so a dead parked
+  event is replayed by re-opening it for the retry worker, not by sending it to the main topic again.
+- **The investigator reads the ledger's database, never its API,** so it never holds the token that can credit.
+- **Kafka** has no authentication today (all listeners PLAINTEXT). SASL changes every service's connection and
+  adds local passwords through `scripts\new_env.ps1 -AddMissing`.
+
+## What M3 originally had to deliver (from `docs/implementation-plan.md`, row 3; the first block is now done)
 - **Pre-registration first, in its own commit, before any arm or investigator code exists:**
   - `docs/failure-catalog.md` (all 18 scenarios)
   - `docs/hypotheses.md` (H1–H5 from spec H3, plus cases where the rules alone are enough, named in advance)
@@ -22,8 +61,7 @@ code.
   - `tests/test_preregistration.py`, which checks with `git log` that these come before anything under `app/arms/` or
     `app/investigator/`, and that the YAML matches the doc
 - **Then a trigger and a reset command for every scenario**, deterministic.
-- **The ledger `members` table** was deferred here from M2 (ADR-0018, owner-confirmed). None of the 18 scenarios
-  obviously needs it. Decide in the M3 plan: build it if a scenario does, otherwise move it to v2.
+- **The ledger `members` table** moved to v2 (ADR-0019): none of the 18 scenarios needs it.
 
 ## What M2 already gives each scenario (spec Part C), and what's missing
 Each scenario needs a trigger, the evidence it leaves, and a reset.
@@ -105,7 +143,8 @@ Evidence that exists now:
 - **Other sessions share this machine.** Ask the owner before any long real-stack batch.
 
 ## Waiting on the owner
-1. **Your OK on the M3 plan**, in the fresh session. No M3 code before that.
+1. **Your OK before each real-stack batch** (Phases 2, 4 and 5), and your look at the re-checked cost estimate before
+   the live run.
 2. **Your fresh-session canary test** is still pending on your side (verification log M1 #37).
 3. **The M2 exercise** in `docs/owner-exercises.md`.
 4. **Optional, on GitHub:** turn on Dependabot alerts, and "Block command line pushes that expose my email".
