@@ -160,6 +160,22 @@ def drain_parked(workers: Any, db: dict[str, Engine], timeout: float = 60.0) -> 
         time.sleep(0.02)
 
 
+def first_claim(worker: RetryWorker, timeout: float = 10.0) -> Any:
+    """Run cycles until one claims a parked event, and return that cycle (a fault hook's exception passes through).
+
+    A parked event is due only `park_base / 2` or more after it was parked (10 ms here), so a single `run_once()`
+    straight after parking can claim nothing on a fast machine. A test that needs the worker to reach a fault point
+    must wait for the claim (found in CI, 2026-11-27: "DID NOT RAISE RetryCrash"). Never claiming is a failure."""
+    deadline = time.monotonic() + timeout
+    while True:
+        cycle = worker.run_once()
+        if cycle.claimed:
+            return cycle
+        if time.monotonic() > deadline:
+            raise AssertionError(f"the worker claimed no parked event within {timeout} s")
+        time.sleep(0.005)
+
+
 def parked_rows(engine: Engine) -> list[dict[str, Any]]:
     with engine.connect() as conn:
         return [dict(r._mapping) for r in conn.execute(text("SELECT * FROM parked_event ORDER BY id"))]
