@@ -9,7 +9,8 @@ comes from how each scenario is built, never from a model.
 ## How to read an entry
 - **Trigger / Reset:** `python -m app.scenarios trigger <id>` and `python -m app.scenarios reset <id>`
   (`scripts\scenario.ps1` is the PowerShell twin). Both are built in Phase 2 of RFC-0002. Every trigger takes
-  `--seed` and writes a manifest of the events it sent to `.scenario-runs/`.
+  `--run` (each run has its own members and stays, so no data is deleted between runs) and writes a manifest of the
+  events it sent to `.scenario-runs/`. `python -m app.scenarios plan <id>` shows what a trigger and its reset do.
 - **Root cause:** one code from the closed list below. An investigation answers with one code (two for a compound
   incident), or `insufficient_evidence`.
 - **Recovery:** one code from the recovery list. `none` means no action from the allowed set is correct; the note
