@@ -11,7 +11,16 @@ import pytest
 from confluent_kafka import KafkaError, KafkaException
 
 from app.pipeline import trace
-from app.pipeline.events import InvalidEvent, ledger_key, points_for, validate
+from app.pipeline.events import (
+    CreditKind,
+    CreditPlan,
+    InvalidEvent,
+    LatestPosting,
+    ledger_key,
+    plan_credit,
+    points_for,
+    validate,
+)
 from app.pipeline.ledger_client import Credited, LedgerClient, LedgerPermanent, LedgerTransient
 from app.pipeline.posting import (
     DatabaseFailure,
@@ -69,7 +78,7 @@ def test_a_valid_event():
         ({"nights": 2}, {}, "invalid_field"),  # check_in..check_out is 3 nights
         ({"room_rate_cents": -1}, {}, "invalid_field"),
         ({"currency": "EUR"}, {}, "invalid_field"),
-        ({"revision": 2}, {}, "unsupported_revision"),  # corrections come in PR-C
+        ({"revision": 0}, {}, "invalid_field"),  # 1 is the original; corrections are 2 and up (D10)
     ],
 )
 def test_invalid_events_are_refused_with_a_reason(changes, header_changes, code):
@@ -88,6 +97,48 @@ def test_only_the_room_rate_earns_ten_points_a_dollar_rounded_down():
 def test_the_ledger_key_is_the_business_key():
     rec = record()
     assert ledger_key(validate(rec, headers(rec))) == "BR-0001:1"
+
+
+# ---------- corrections (RFC-0001 D10) ----------
+
+
+def event_at(revision, room_rate_cents=45_000):
+    rec = record(revision=revision, room_rate_cents=room_rate_cents)
+    return validate(rec, headers(rec))
+
+
+def test_a_correction_is_valid_and_has_its_own_ledger_key():
+    assert ledger_key(event_at(3)) == "BR-0001:3"
+
+
+@pytest.mark.parametrize(
+    ("revision", "rate", "latest", "expected"),
+    [
+        (1, 45_000, None, CreditPlan(CreditKind.CREDIT, 4_500)),  # an original: the whole stay
+        (2, 50_000, LatestPosting(1, 4_500), CreditPlan(CreditKind.CREDIT, 500, 1)),  # rate up: +500
+        (2, 30_000, LatestPosting(1, 4_500), CreditPlan(CreditKind.CREDIT, -1_500, 1)),  # rate down: negative
+        (2, 45_000, LatestPosting(1, 4_500), CreditPlan(CreditKind.CREDIT, 0, 1)),  # same points: a zero credit
+        (4, 60_000, LatestPosting(2, 5_000), CreditPlan(CreditKind.CREDIT, 1_000, 2)),  # a gap: from the latest
+        (2, 50_000, LatestPosting(3, 6_000), CreditPlan(CreditKind.STALE, 0, 3)),  # older than the latest
+        (3, 50_000, LatestPosting(3, 6_000), CreditPlan(CreditKind.STALE, 0, 3)),  # equal (another event ID)
+        (1, 45_000, LatestPosting(2, 5_000), CreditPlan(CreditKind.STALE, 0, 2)),  # a late original
+        (2, 50_000, None, CreditPlan(CreditKind.ORIGINAL_MISSING)),  # a correction before its original
+    ],
+)
+def test_the_correction_rule(revision, rate, latest, expected):
+    assert plan_credit(event_at(revision, rate), latest) == expected
+
+
+def test_corrections_add_up_to_the_latest_revision_whatever_the_gaps():
+    """Credits over revisions 1, 2 and 4 (3 never arrives) sum to what revision 4 earns: nothing lost, nothing twice."""
+    latest, total = None, 0
+    for revision, rate in [(1, 45_000), (2, 52_000), (4, 39_900)]:
+        event = event_at(revision, rate)
+        plan = plan_credit(event, latest)
+        total += plan.credited_points
+        latest = LatestPosting(revision, points_for(event))
+    assert total == points_for(event_at(4, 39_900)) == 3_990
+    assert plan_credit(event_at(3, 99_000), latest).kind == CreditKind.STALE  # revision 3 arriving now is skipped
 
 
 def test_build_event_makes_a_valid_event_each_time():

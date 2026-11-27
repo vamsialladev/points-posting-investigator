@@ -217,18 +217,58 @@ def test_an_undecodable_event_is_dead_lettered_and_the_next_event_flows(db, ledg
     assert headers["original_topic"] == scratch["input"]
 
 
-def test_a_correction_is_dead_lettered_until_pr_c(db, ledger, kafka, registry, scratch):
+def test_corrections_credit_the_difference_and_a_stale_revision_is_skipped(db, ledger, kafka, registry, scratch):
+    """D10 (catalog scenario 11), replacing B2a's "dead-lettered until PR-C". Revisions 1, 3, then 2 of one stay:
+    1 credits the stay, 3 the difference from 1, and 2 (now stale) is recorded and not credited."""
+    original = stay("GR-00001", 1, room_rate_cents=40_000)  # 4,000 points
+    third = stay("GR-00001", 1, room_rate_cents=46_000, revision=3)  # 4,600: +600
+    second = stay("GR-00001", 1, room_rate_cents=10_000, revision=2)  # arrives last: stale
+    producer = checkout_producer(kafka, registry, scratch["input"])
+    for rec in (original, third, second):
+        producer.send(rec)
+    loop = make_loop(
+        service_for(db, ledger, kafka, registry, scratch), kafka, "g-" + uuid.uuid4().hex[:6], scratch["input"]
+    )
+    assert run_until(loop, 3) == [Outcome.POSTED, Outcome.POSTED, Outcome.SKIPPED]  # one member: one partition
+
+    with db["ledger"].connect() as conn:
+        assert credit_problems(conn, {"BR-0001:1": 4_000, "BR-0001:3": 600}) == []
+        assert conn.execute(text("SELECT sum(points) FROM credits")).scalar() == 4_600  # what revision 3 earns
+    with db["posting"].connect() as conn:
+        skipped = conn.execute(text("SELECT event_id, revision, latest_revision FROM skipped_event")).all()
+    assert [tuple(r) for r in skipped] == [(second["event_id"], 2, 3)]
+    relay = make_relay("r1", kafka, registry, db["relay"], scratch["output"])
+    drain([relay], lambda: open_rows(db["relay"]) == 0)
+    received = read_topic(kafka, registry, scratch["output"], at_least=2)
+    assert sorted(m.value["credited_points"] for m in received) == [600, 4_000]
+
+
+def test_a_correction_before_its_original_is_retried_then_dead_lettered_as_original_missing(
+    db, ledger, kafka, registry, scratch
+):
+    """RFC-0001 test 12: nothing posted for the stay, so the correction is parked, retried to the maximum, and sent to
+    the DLQ with its original bytes. Nothing is credited."""
     rec = stay("GR-00001", 1, revision=2)
     checkout_producer(kafka, registry, scratch["input"]).send(rec)
     loop = make_loop(
         service_for(db, ledger, kafka, registry, scratch), kafka, "g-" + uuid.uuid4().hex[:6], scratch["input"]
     )
-    assert run_until(loop, 1) == [Outcome.DEAD_LETTERED]
+    assert run_until(loop, 1) == [Outcome.PARKED]
+    worker = make_worker(db, ledger, kafka, registry, scratch)
+    drain_parked(worker, db)
     [dead] = read_raw(kafka, scratch["dlq"], at_least=1)
-    assert dict((k, v.decode()) for k, v in dead.headers())["error_class"] == "unsupported_revision"
+    headers = dict((k, v.decode()) for k, v in dead.headers())
+    assert (headers["error_class"], headers["attempt"]) == ("original_missing", "5")
+    assert headers["event_id"] == rec["event_id"]
     assert counts(db["posting"]) == (0, 0)
     with db["ledger"].connect() as conn:
         assert credit_problems(conn, {}) == []  # nothing credited
+
+
+def test_the_posting_role_can_not_change_or_delete_a_skipped_event(db):
+    for statement in ("UPDATE skipped_event SET revision = 9", "DELETE FROM skipped_event"):
+        with db["posting"].connect() as conn, pytest.raises(Exception, match="permission denied"):
+            conn.execute(text(statement))
 
 
 def test_a_ledger_outage_parks_the_event_commits_the_offset_and_the_worker_posts_it_later(

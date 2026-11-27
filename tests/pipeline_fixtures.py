@@ -27,7 +27,7 @@ from tests.test_kafka_stack import drop_subject
 @pytest.fixture
 def db(admin, passwords, host) -> Iterator[dict[str, Engine]]:
     with admin_connect(admin, POSTING) as conn:
-        conn.execute("TRUNCATE posting, outbox, parked_event RESTART IDENTITY")
+        conn.execute("TRUNCATE posting, outbox, parked_event, skipped_event RESTART IDENTITY")
     with admin_connect(admin, LEDGER) as conn:
         conn.execute("TRUNCATE credits")
     engines = {

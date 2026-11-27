@@ -7,6 +7,7 @@ from datetime import UTC, date, datetime
 
 import pytest
 
+from app.pipeline.events import LatestPosting
 from app.pipeline.ledger_client import Credited, LedgerPermanent, LedgerTransient
 from app.pipeline.posting import DeadLetterFailure
 from app.pipeline.producer import build_event
@@ -102,21 +103,32 @@ class FakeParked:
 @dataclass
 class FakePostings:
     posted: bool = False
+    latest: LatestPosting | None = None
     writes: list = field(default_factory=list)
+    skips: list = field(default_factory=list)
 
     def already_posted(self, event):
         return self.posted
 
-    def write(self, event, entry_id, trace_context, fault=None, parked=None):
-        self.writes.append((event.event_id, entry_id, parked))
+    def latest_posting(self, stay_id):
+        return self.latest
+
+    def record_skipped(self, event, plan):
+        self.skips.append((event.event_id, plan.latest_revision))
+        return True
+
+    def write(self, event, entry_id, trace_context, fault=None, parked=None, credited=None):
+        self.writes.append((event.event_id, entry_id, parked, credited))
         return True
 
 
 @dataclass
 class FakeLedger:
     result: object = field(default_factory=lambda: Credited("L-0000009", False))
+    calls: list = field(default_factory=list)
 
     def credit(self, *args):
+        self.calls.append(args)
         if isinstance(self.result, Exception):
             raise self.result
         return self.result
@@ -149,10 +161,41 @@ def test_a_success_writes_the_posting_and_marks_the_parked_event_done_in_one_cal
     w = worker([parked()])
     result = w.run_once()
     assert (result.claimed, result.posted) == (1, 1)
-    [(event_id, entry_id, parked_arg)] = w.postings.writes
-    assert (event_id, entry_id) == (RECORD["event_id"], "L-0000009")
+    [(event_id, entry_id, parked_arg, credited)] = w.postings.writes
+    assert (event_id, entry_id, credited) == (RECORD["event_id"], "L-0000009", 2_000)
     assert parked_arg == ("w1", 1)  # the store marks it done inside the posting transaction
     assert w.parked.marks == []
+
+
+# ---------- corrections (RFC-0001 D10) ----------
+
+CORRECTION = {**RECORD, "revision": 2, "room_rate_cents": 25_000}  # 2,500 points; revision 1 earned 2,000
+
+
+def test_a_parked_correction_credits_the_difference():
+    w = worker([parked(record=CORRECTION)], postings=FakePostings(latest=LatestPosting(1, 2_000)), record=CORRECTION)
+    assert w.run_once().posted == 1
+    assert w.ledger.calls == [("BR-0001:2", "GR-00001", "BR-0001", 500, CORRECTION["correlation_id"])]
+    assert w.postings.writes[0][3] == 500
+
+
+def test_a_parked_stale_revision_is_recorded_and_marked_done_without_a_credit():
+    w = worker([parked(record=CORRECTION)], postings=FakePostings(latest=LatestPosting(2, 2_500)), record=CORRECTION)
+    assert w.run_once().posted == 0
+    assert w.postings.skips == [(CORRECTION["event_id"], 2)]
+    assert w.parked.marks == [(1, "done", 0, 0, None)]
+    assert w.ledger.calls == [] and w.postings.writes == []
+
+
+def test_a_correction_whose_original_never_posts_is_dead_lettered_at_the_maximum():
+    w = worker([parked(attempts=3, record=CORRECTION)], postings=FakePostings(latest=None), record=CORRECTION)
+    w.run_once()
+    assert w.parked.marks == [(1, "pending", 4, 0, "original_missing")]
+    w = worker([parked(attempts=4, record=CORRECTION)], postings=FakePostings(latest=None), record=CORRECTION)
+    w.run_once()
+    assert w.parked.marks == [(1, "dead", 5, 0, "original_missing")]
+    assert [sent[1:3] for sent in w.dead_letters.sent] == [("original_missing", 5)]
+    assert w.ledger.calls == []
 
 
 def test_an_event_posted_meanwhile_is_just_marked_done():
