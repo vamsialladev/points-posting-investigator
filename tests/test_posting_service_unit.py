@@ -15,7 +15,7 @@ from app.pipeline import trace
 from app.pipeline.events import validate
 from app.pipeline.ledger_client import Credited, LedgerPermanent, LedgerTransient
 from app.pipeline.posting import IncomingMessage, Outcome, PostingService, outbox_payload
-from app.pipeline.producer import CheckoutProducer, build_event, synthetic_events
+from app.pipeline.producer import CheckoutProducer, DeliveryFailed, build_event, synthetic_events
 
 TP = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"
 
@@ -24,12 +24,25 @@ TP = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"
 class FakeStore:
     posted: bool = False
     new: bool = True
+    parked_already: bool = False
+    member_parked: bool = False
     writes: list = field(default_factory=list)
+    parks: list = field(default_factory=list)
 
     def already_posted(self, event):
         return self.posted
 
-    def write(self, event, entry_id, trace_context, fault=None):
+    def already_parked(self, event_id):
+        return self.parked_already
+
+    def member_has_parked(self, member_number):
+        return self.member_parked
+
+    def park(self, message, event, reason, delay):
+        self.parks.append((event.event_id, reason.kind, reason.error_class))
+        return True
+
+    def write(self, event, entry_id, trace_context, fault=None, parked=None):
         self.writes.append((event.event_id, entry_id, dict(trace_context)))
         return self.new
 
@@ -50,7 +63,7 @@ class FakeLedger:
 class FakeDeadLetters:
     sent: list = field(default_factory=list)
 
-    def publish(self, message, error_class, detail, attempts=1):
+    def publish(self, message, error_class, detail, attempts=1, first_failed_at=None):
         self.sent.append((message.offset, error_class))
 
 
@@ -111,7 +124,6 @@ def test_a_race_lost_at_the_insert_is_a_duplicate():
             message(),
             "ledger_idempotency_conflict",
         ),
-        ({"ledger": FakeLedger(LedgerPermanent("rejected_422"))}, message(), "ledger_rejected_422"),
     ],
 )
 def test_what_can_never_post_is_dead_lettered_with_its_class_and_nothing_is_written(kwargs, msg, error_class):
@@ -122,11 +134,33 @@ def test_what_can_never_post_is_dead_lettered_with_its_class_and_nothing_is_writ
     assert f'posting_dlq_messages_total{{error_class="{error_class}"}} 1.0' in svc.metrics.render().decode()
 
 
-def test_a_transient_ledger_failure_propagates_so_the_consumer_retries():
-    svc = service(ledger=FakeLedger(LedgerTransient("unavailable_503")))
-    with pytest.raises(LedgerTransient):
-        svc.handle(message())
+@pytest.mark.parametrize(
+    ("failure", "kind", "error_class"),
+    [
+        (LedgerTransient("unavailable_503"), "transient", "ledger_unavailable_503"),
+        (LedgerTransient("unauthorized"), "transient", "ledger_unauthorized"),
+        (LedgerPermanent("rejected_422"), "permanent", "ledger_rejected_422"),  # counted; dead after 5 (ADR-0016)
+    ],
+)
+def test_a_ledger_failure_parks_the_event_instead_of_blocking_the_partition(failure, kind, error_class):
+    svc = service(ledger=FakeLedger(failure))
+    assert svc.handle(message()) is Outcome.PARKED
+    assert svc.store.parks == [(RECORD["event_id"], kind, error_class)]
     assert svc.store.writes == [] and svc.dead_letters.sent == []
+
+
+def test_an_event_behind_a_parked_one_parks_too_without_calling_the_ledger():
+    # Per-member order: event 2 must not overtake event 1 while event 1 waits for a retry.
+    svc = service(store=FakeStore(member_parked=True))
+    assert svc.handle(message()) is Outcome.PARKED
+    assert svc.store.parks == [(RECORD["event_id"], "behind", None)]
+    assert svc.ledger.calls == []
+
+
+def test_a_redelivered_parked_event_is_a_duplicate():
+    svc = service(store=FakeStore(parked_already=True))
+    assert svc.handle(message()) is Outcome.DUPLICATE
+    assert svc.store.parks == [] and svc.ledger.calls == []
 
 
 def test_a_message_without_a_traceparent_starts_a_new_trace():
@@ -150,12 +184,17 @@ def test_the_outbox_payload_has_its_own_fixed_id_and_the_source_event():
 
 class FakeProducer:
     def __init__(self, undelivered=0):
-        self.sent, self.undelivered = [], undelivered
+        self.sent, self.undelivered, self.callbacks = [], undelivered, []
 
-    def produce(self, topic, key, value, headers):
+    def produce(self, topic, key, value, headers, on_delivery):
         self.sent.append((topic, key, value, dict(headers)))
+        self.callbacks.append(on_delivery)
 
     def flush(self, timeout):
+        if not self.undelivered:  # delivered: every message gets its report
+            for callback in self.callbacks:
+                callback(None, None)
+        self.callbacks = []
         return self.undelivered
 
 
@@ -173,7 +212,7 @@ def test_the_producer_keys_by_member_and_sets_the_headers():
 
 def test_the_producer_reports_undelivered_events_and_needs_a_registry_or_serializer():
     producer = CheckoutProducer(FakeProducer(undelivered=1), None, serialize=lambda record, ctx: b"x")
-    with pytest.raises(RuntimeError, match="not delivered"):
+    with pytest.raises(DeliveryFailed, match="not delivered"):
         producer.send(RECORD)
     with pytest.raises(ValueError):
         CheckoutProducer(FakeProducer(), None)

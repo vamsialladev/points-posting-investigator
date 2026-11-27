@@ -1,0 +1,30 @@
+F
+================================== FAILURES ===================================
+_ test_a_poison_event_is_retried_to_the_maximum_then_dead_lettered_and_nobody_else_waits _
+
+db = {'posting': Engine(postgresql+psycopg://test_posting_app:***@127.0.0.1:5432/test_posting?connect_timeout=10), 'relay':..._timeout=10), 'ledger': Engine(postgresql+psycopg://test_ledger_app:***@127.0.0.1:5432/test_ledger?connect_timeout=10)}
+ledger = ('http://127.0.0.1:55650', 'HquxDLyOQc5uBS3UvSVWtMUu')
+kafka = '127.0.0.1:9092'
+registry = <confluent_kafka.schema_registry._sync.schema_registry_client.SchemaRegistryClient object at 0x00000209356DD580>
+scratch = {'input': 'test.in.85ec98abd3', 'output': 'test.out.85ec98abd3', 'dlq': 'test.dlq.85ec98abd3'}
+
+    def test_a_poison_event_is_retried_to_the_maximum_then_dead_lettered_and_nobody_else_waits(
+        db, ledger, kafka, registry, scratch
+    ):
+        poison = stay("GR-00001", 1, room_rate_cents=200_000_000)  # 20,000,000 points: over the ledger's limit, a real 422
+        later_same_member = stay("GR-00001", 3)
+        other_member = stay("GR-00002", 5)
+        producer = checkout_producer(kafka, registry, scratch["input"])
+        for rec in (poison, later_same_member, other_member):
+            producer.send(rec)
+        loop = consumer_for(db, ledger, kafka, registry, scratch)
+>       assert run_until(loop, 3) == [Outcome.PARKED, Outcome.PARKED, Outcome.POSTED]  # the other member didn't wait
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: assert [<Outcome.POS...ED: 'parked'>] == [<Outcome.PAR...ED: 'posted'>]
+E         
+E         At index 0 diff: <Outcome.POSTED: 'posted'> != <Outcome.PARKED: 'parked'>
+E         Use -v to get more diff
+
+tests\test_parking_kafka.py:68: AssertionError
+1 failed, 351 deselected in 26.97s
+stack settings: 6/6 set

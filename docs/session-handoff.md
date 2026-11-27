@@ -1,7 +1,37 @@
 # Session handoff
 
-**Updated:** 2026-11-26. M2 PR-B2a (the producer and the posting service) is merged (#6, `42a4401`). B2b and PR-C
-remain. The B2b plan has been shown to the owner and waits for approval; no B2b code exists yet.
+**Updated:** 2026-11-27. M2 PR-B2b passed its 10× batch on a quiet machine (140/140, verification log M2 PR-B2b #28)
+and is pushed as a PR, auto-merging when CI is green. PR-C is being built on `m2/pr-c` (worktree
+`..\points-posting-investigator-prc`); its real-stack tests wait until the owner says the machine is free.
+
+## Resume here (B2b)
+1. `git switch m2/parking-retry`; `scripts\stack.ps1 up` (9 services, incl. `retry-worker` and Kafka's test-only
+   `FAULTS` listener on `127.0.0.1:19093`).
+2. **Quiet check:**
+   `powershell -ExecutionPolicy Bypass -File scripts\quiet_check.ps1 -Minutes 5 -Out docs\evidence\m2-pr-b2b-quiet-check.md`.
+   Go on only if it says QUIET (exit 0); record it either way.
+3. **The 10× batch**, no code edits while it runs:
+   `scripts\repeat_tests.ps1 -Times 10 -Out docs\evidence\m2-pr-b2b-repeat-runs-final.md`, with these tests:
+   - the B2b parking tests: `poison_event_is_retried`, `per_member_order_holds_while_the_first`,
+     `crash_after_parking`, `worker_crash_after_the_credit`, `db_failure_inside_the_worker`,
+     `two_workers_never_claim`, `long_ledger_outage_never`, `ledger_outage_parks_the_event`
+   - B2a's `eight_concurrent_copies` and `eight_concurrent_resends`
+   - the producer tests: `topic_that_does_not_exist`, `unreachable_broker`, `producer_retries_add_no_duplicates`,
+     `without_idempotence`
+
+   Busy runs are flagged and re-run, never counted. Any failure means finding the cause before any PR.
+4. Add the results to the verification log (M2 PR-B2b, after #20). Then push, open the PR, wait for its five CI
+   checks, and auto-merge only when green. Stop the stack with `scripts\stack.ps1 down`.
+
+**What B2b changed** (verification log M2 PR-B2b #1–#20):
+- **Parking (ADR-0016):** parking table, retry worker, per-member order, retry topics removed.
+- **Producer silent loss found and fixed (ADR-0017; incident `docs/incidents/2026-11-26-producer-silent-loss.md`):**
+  the old producer reported success for events Kafka never took. Under fault injection the fixed producer gave
+  0 duplicates; without idempotence, the same fault gave 37.
+- **Offset-commit failure:** now a warning plus a metric, and the consumer keeps going.
+- **A new repeat script and quiet check.**
+- **Offline:** 311 tests pass, 81.31% coverage.
+- **Batch 1 was on the old code and a busy machine:** 4 tests at 9/10. Not yet repeated on the final code.
 
 ## Where things stand
 - **Milestone 1 is complete** and on `main` (https://github.com/vamsialladev/points-posting-investigator, public;
@@ -20,20 +50,21 @@ remain. The B2b plan has been shown to the owner and waits for approval; no B2b 
        - seeks back on database, ledger or dead-letter-topic failures
        - dead-letters events that can never post, with their original bytes
      - the `posting` container
-  4. **PR-B2b, next (plan waiting for your OK):**
+  4. **PR-B2b, built on `m2/parking-retry`, waiting for the 10× batch (see "Resume here"):**
      - the parking table and retry worker (backoff, max attempts, then the dead-letter topic)
      - per-member order under retries
      - the retry topics removed
+     - the producer silent-loss fix and offset-commit failure handling
   5. **PR-C:** corrections (revision > 1), the load generator and seeds, the schema gate, `docs/event-semantics.md`.
 - **PR-B2a checks** (`docs/verification-log.md`, M2 PR-B2a #1–#9):
   - 275 offline tests pass (80.40% coverage); 53 real-stack tests pass; local CI 11/11
   - **Repeat runs on the final code:** 8 crash and concurrency tests passed 10/10 each
     (`docs/evidence/m2-pr-b2a-repeat-runs.md`)
   - PR #6's five CI checks passed before auto-merge
-- **What B2a still does that B2b changes:**
-  - a transient ledger failure is retried in place, so its partition waits
-  - a permanent ledger refusal (409, other 4xx) is dead-lettered at the first attempt
-- **The stack is stopped**, with its data kept. Start it with `scripts\stack.ps1 up`; stop it with
+- **What B2b changes in B2a (once merged):**
+  - a transient ledger failure parks the event instead of holding up its partition
+  - a permanent refusal is retried up to 5 times before the dead-letter topic; a 409 is dead-lettered at once
+- **The stack is running** while B2b waits for its batch (see "Resume here"). Start it with `scripts\stack.ps1 up`; stop it with
   `scripts\stack.ps1 down`; `scripts\stack.ps1 reset` deletes the data.
 - **Secret deny rules at the project1 level** (ADR-0008, ADR-0009): `C:\projects\project1\.claude\settings.json`
   (outside every repo, not committed) holds 368 deny rules. Every `*.env` file is refused to Read, Edit and Write,
@@ -43,7 +74,8 @@ remain. The B2b plan has been shown to the owner and waits for approval; no B2b 
   public repo).
 
 ## Waiting on the owner
-1. **Approve, or change, the B2b plan.** No B2b code until you do.
+1. **A quiet machine** for B2b's 10× batch. You're coordinating the other sessions; the batch starts only after a
+   5-minute QUIET result.
 2. **Your fresh-session canary test** is still pending on your side (verification log M1 #37).
 3. **Optional, on GitHub:** turn on Dependabot alerts, and "Block command line pushes that expose my email".
 

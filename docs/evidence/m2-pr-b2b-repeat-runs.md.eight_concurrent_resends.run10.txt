@@ -1,0 +1,149 @@
+F
+================================== FAILURES ===================================
+_ test_eight_concurrent_resends_under_new_event_ids_give_one_credit_and_one_posting _
+
+    @contextlib.contextmanager
+    def map_httpcore_exceptions() -> Generator[None]:
+        global HTTPCORE_EXC_MAP
+        if len(HTTPCORE_EXC_MAP) == 0:
+            HTTPCORE_EXC_MAP = _load_httpcore_exceptions()
+        try:
+>           yield
+
+.venv\Lib\site-packages\httpx2\_transports\default.py:95: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+.venv\Lib\site-packages\httpx2\_transports\default.py:242: in handle_request
+    resp = self._pool.handle_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpcore2\_sync\connection_pool.py:243: in handle_request
+    raise exc from None
+.venv\Lib\site-packages\httpcore2\_sync\connection_pool.py:225: in handle_request
+    response = connection.handle_request(pool_request.request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpcore2\_sync\connection.py:98: in handle_request
+    return self._connection.handle_request(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpcore2\_sync\http11.py:125: in handle_request
+    raise exc
+.venv\Lib\site-packages\httpcore2\_sync\http11.py:97: in handle_request
+    ) = self._receive_response_headers(**kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpcore2\_sync\http11.py:167: in _receive_response_headers
+    event = self._receive_event(timeout=timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpcore2\_sync\http11.py:200: in _receive_event
+    data = self._network_stream.read(self.READ_NUM_BYTES, timeout=timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpcore2\_backends\sync.py:126: in read
+    with map_exceptions(exc_map):
+         ^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Vamsi\AppData\Local\Programs\Python\Python312\Lib\contextlib.py:158: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+map = {<class 'TimeoutError'>: <class 'httpcore2.ReadTimeout'>, <class 'OSError'>: <class 'httpcore2.ReadError'>}
+
+    @contextlib.contextmanager
+    def map_exceptions(map: ExceptionMapping) -> Generator[None]:
+        try:
+            yield
+        except Exception as exc:
+            for from_exc, to_exc in map.items():
+                if isinstance(exc, from_exc):
+>                   raise to_exc(exc) from exc
+E                   httpcore2.ReadTimeout: timed out
+
+.venv\Lib\site-packages\httpcore2\_exceptions.py:16: ReadTimeout
+
+The above exception was the direct cause of the following exception:
+
+db = {'posting': Engine(postgresql+psycopg://test_posting_app:***@127.0.0.1:5432/test_posting?connect_timeout=10), 'relay':..._timeout=10), 'ledger': Engine(postgresql+psycopg://test_ledger_app:***@127.0.0.1:5432/test_ledger?connect_timeout=10)}
+ledger = ('http://127.0.0.1:51054', 'f273q66wjJhJe6eKR_OvXPBQ')
+kafka = '127.0.0.1:9092'
+registry = <confluent_kafka.schema_registry._sync.schema_registry_client.SchemaRegistryClient object at 0x0000023076B49670>
+scratch = {'input': 'test.in.af7475b263', 'output': 'test.out.af7475b263', 'dlq': 'test.dlq.af7475b263'}
+
+    def test_eight_concurrent_resends_under_new_event_ids_give_one_credit_and_one_posting(
+        db, ledger, kafka, registry, scratch
+    ):
+        """Change 1 (2026-11-23): the ledger key is the stay, so a re-emitted stay can't be credited twice in a race."""
+        base = stay("GR-00001", 1)
+        copies = [{**base, "event_id": str(uuid.uuid4())} for _ in range(8)]
+        producer = checkout_producer(kafka, registry, scratch["input"])
+        for rec in copies:
+>           producer.send(rec)
+
+tests\test_posting_kafka.py:187: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+app\pipeline\producer.py:109: in send
+    value = self._serialize(record, SerializationContext(self.topic, MessageField.VALUE))
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\avro.py:399: in __call__
+    return self.__serialize(obj, ctx)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\avro.py:405: in __serialize
+    return self.__serialize_impl(obj, ctx)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\avro.py:457: in __serialize_impl
+    registered_schema = self._registry.register_schema_full_response(
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\schema_registry_client.py:786: in register_schema_full_response
+    response = self._rest_client.post(
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\schema_registry_client.py:470: in post
+    return self.send_request(url, method='POST', body=body)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\schema_registry_client.py:537: in send_request
+    raise e
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\schema_registry_client.py:525: in send_request
+    response = self.send_http_request(base_url, url, method, headers, body_str, query)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\schema_registry_client.py:594: in send_http_request
+    response = self.session.request(
+.venv\Lib\site-packages\httpx2\_client.py:791: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpx2\_client.py:974: in send
+    response = self._send_handling_auth(
+.venv\Lib\site-packages\httpx2\_client.py:1002: in _send_handling_auth
+    response = self._send_handling_redirects(
+.venv\Lib\site-packages\httpx2\_client.py:1037: in _send_handling_redirects
+    response = self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpx2\_client.py:1070: in _send_single_request
+    response = transport.handle_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpx2\_transports\default.py:241: in handle_request
+    with map_httpcore_exceptions():
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Vamsi\AppData\Local\Programs\Python\Python312\Lib\contextlib.py:158: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    @contextlib.contextmanager
+    def map_httpcore_exceptions() -> Generator[None]:
+        global HTTPCORE_EXC_MAP
+        if len(HTTPCORE_EXC_MAP) == 0:
+            HTTPCORE_EXC_MAP = _load_httpcore_exceptions()
+        try:
+            yield
+        except Exception as exc:
+            mapped_exc = None
+    
+            for from_exc, to_exc in HTTPCORE_EXC_MAP.items():
+                if not isinstance(exc, from_exc):
+                    continue
+                # We want to map to the most specific exception we can find.
+                # Eg if `exc` is an `httpcore2.ReadTimeout`, we want to map to
+                # `httpx2.ReadTimeout`, not just `httpx2.TimeoutException`.
+                if mapped_exc is None or issubclass(to_exc, mapped_exc):
+                    mapped_exc = to_exc
+    
+            if mapped_exc is None:  # pragma: no cover
+                raise
+    
+            message = str(exc)
+>           raise mapped_exc(message) from exc
+E           httpx2.ReadTimeout: timed out
+
+.venv\Lib\site-packages\httpx2\_transports\default.py:112: ReadTimeout
+1 failed, 351 deselected in 118.45s (0:01:58)
+stack settings: 6/6 set

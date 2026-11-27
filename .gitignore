@@ -60,3 +60,6 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 *.stackdump
+
+# Full output of every repeat-test run (scripts/repeat_tests.ps1); runs that fail are copied to docs/evidence
+.test-logs/

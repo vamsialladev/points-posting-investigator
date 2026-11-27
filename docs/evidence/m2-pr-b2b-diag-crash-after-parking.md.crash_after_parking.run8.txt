@@ -1,0 +1,11 @@
+stack settings: 6/6 set
+ImportError while loading conftest 'C:\projects\project1\points-posting-investigator\tests\conftest.py'.
+tests\conftest.py:5: in <module>
+    from tests.pipeline_fixtures import db, ledger, scratch  # noqa: F401 (pytest finds fixtures by name)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\pipeline_fixtures.py:23: in <module>
+    from tests.posting_helpers import ledger_server
+tests\posting_helpers.py:34: in <module>
+    from app.pipeline.producer import CheckoutProducer, make_checkout_producer
+E   ImportError: cannot import name 'make_checkout_producer' from 'app.pipeline.producer' (C:\projects\project1\points-posting-investigator\app\pipeline\producer.py)
+repeat_tests: exit code 4 after 22 s

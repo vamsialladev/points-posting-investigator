@@ -1,0 +1,49 @@
+﻿uv : %4|1795738085.171|CONFWARN|rdkafka#producer-1| [thrd:app]: Configuration property enable.gapless.guarantee is 
+experimental: When set to `true`, any error that could result in a gap in the produced message series when a batch of 
+messages fails, will raise a fatal error (ERR__GAPLESS_GUARANTEE) and stop the producer. Messages failing due to 
+`message.timeout.ms` are not covered by this guarantee. Requires `enable.idempotence=true`.
+At line:1 char:438
++ ... afka8.txt"; uv run python scripts\run_integration.py -k test_producer ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (%4|1795738085.1...mpotence=true`.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+%4|1795738087.737|CONFWARN|rdkafka#producer-2| [thrd:app]: Configuration property enable.gapless.guarantee is 
+experimental: When set to `true`, any error that could result in a gap in the produced message series when a batch of 
+messages fails, will raise a fatal error (ERR__GAPLESS_GUARANTEE) and stop the producer. Messages failing due to 
+`message.timeout.ms` are not covered by this guarantee. Requires `enable.idempotence=true`.
+%3|1795738090.134|FAIL|rdkafka#producer-2| [thrd:127.0.0.1:9/bootstrap]: 127.0.0.1:9/bootstrap: Connect to 
+ipv4#127.0.0.1:9 failed: Unknown error (after 2029ms in state CONNECT)
+%3|1795738092.385|FAIL|rdkafka#producer-2| [thrd:127.0.0.1:9/bootstrap]: 127.0.0.1:9/bootstrap: Connect to 
+ipv4#127.0.0.1:9 failed: Unknown error (after 2042ms in state CONNECT)
+%3|1795738096.106|FAIL|rdkafka#producer-2| [thrd:127.0.0.1:9/bootstrap]: 127.0.0.1:9/bootstrap: Connect to 
+ipv4#127.0.0.1:9 failed: Unknown error (after 2013ms in state CONNECT)
+%3|1795738098.385|FAIL|rdkafka#producer-2| [thrd:127.0.0.1:9/bootstrap]: 127.0.0.1:9/bootstrap: Connect to 
+ipv4#127.0.0.1:9 failed: Unknown error (after 2045ms in state CONNECT)
+%3|1795738100.677|FAIL|rdkafka#producer-2| [thrd:127.0.0.1:9/bootstrap]: 127.0.0.1:9/bootstrap: Connect to 
+ipv4#127.0.0.1:9 failed: Unknown error (after 2042ms in state CONNECT)
+%3|1795738103.356|FAIL|rdkafka#producer-2| [thrd:127.0.0.1:9/bootstrap]: 127.0.0.1:9/bootstrap: Connect to 
+ipv4#127.0.0.1:9 failed: Unknown error (after 2052ms in state CONNECT)
+%4|1795738104.674|CONFWARN|rdkafka#producer-4| [thrd:app]: Configuration property enable.gapless.guarantee is 
+experimental: When set to `true`, any error that could result in a gap in the produced message series when a batch of 
+messages fails, will raise a fatal error (ERR__GAPLESS_GUARANTEE) and stop the producer. Messages failing due to 
+`message.timeout.ms` are not covered by this guarantee. Requires `enable.idempotence=true`.
+%4|1795738106.466|GETPID|rdkafka#producer-4| [thrd:main]: Failed to acquire idempotence PID from broker 
+127.0.0.1:19092/bootstrap: Local: Broker handle destroyed without termination: retrying
+%4|1795738122.511|FAIL|rdkafka#producer-4| [thrd:127.0.0.1:19092/1]: 127.0.0.1:19092/1: Disconnected: connection 
+closed by peer: POLLHUP (after 14388ms in state UP)
+%6|1795738124.940|FAIL|rdkafka#producer-4| [thrd:127.0.0.1:19092/1]: 127.0.0.1:19092/1: Disconnected: connection 
+closed by peer: POLLHUP (after 1064ms in state UP)
+..evidence: idempotent: 3 ProduceRequest ack(s) cut; 0 duplicates; nothing lost; order kept
+%4|1795738133.944|CONFWARN|rdkafka#producer-8| [thrd:app]: Configuration property enable.gapless.guarantee is 
+experimental: When set to `true`, any error that could result in a gap in the produced message series when a batch of 
+messages fails, will raise a fatal error (ERR__GAPLESS_GUARANTEE) and stop the producer. Messages failing due to 
+`message.timeout.ms` are not covered by this guarantee. Requires `enable.idempotence=true`.
+%4|1795738137.815|FAIL|rdkafka#producer-8| [thrd:127.0.0.1:19092/1]: 127.0.0.1:19092/1: Disconnected: connection 
+closed by peer: POLLHUP (after 3471ms in state UP)
+%6|1795738138.324|FAIL|rdkafka#producer-8| [thrd:127.0.0.1:19092/1]: 127.0.0.1:19092/1: Disconnected: connection 
+closed by peer: POLLHUP (after 169ms in state UP)
+.evidence: not idempotent: 5 ProduceRequest ack(s) cut; 37 duplicate message(s)
+.
+4 passed, 361 deselected in 91.70s (0:01:31)
+stack settings: 6/6 set

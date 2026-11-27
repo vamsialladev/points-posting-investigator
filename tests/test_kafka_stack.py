@@ -18,7 +18,6 @@ from confluent_kafka import Consumer, Producer
 from confluent_kafka.admin import AdminClient
 from confluent_kafka.schema_registry import ConfigCompatibilityLevel, Schema, SchemaRegistryClient, ServerConfig
 from confluent_kafka.schema_registry.avro import AvroDeserializer, AvroSerializer
-from confluent_kafka.schema_registry.error import SchemaRegistryError
 from confluent_kafka.serialization import MessageField, SerializationContext
 
 from app.pipeline import schemas, topics
@@ -134,5 +133,6 @@ def drop_subject(registry: SchemaRegistryClient, subject: str) -> None:
     """Soft then hard delete. Cleanup must not hide the real error: a subject never registered, or a registry briefly
     unavailable (calls are bounded by the client's timeout), leaves at most a stray test subject behind."""
     for permanent in (False, True):
-        with contextlib.suppress(SchemaRegistryError, OSError, RuntimeError, ValueError):
+        # Any error: this is cleanup. A registry still recovering from a Kafka disruption answers with timeouts.
+        with contextlib.suppress(Exception):
             registry.delete_subject(subject, permanent=permanent)

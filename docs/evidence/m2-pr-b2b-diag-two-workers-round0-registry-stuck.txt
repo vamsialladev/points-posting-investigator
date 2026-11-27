@@ -1,0 +1,124 @@
+﻿uv : Traceback (most recent call last):
+At line:1 char:302
++ ... tch {} } }; uv run python "C:\Users\Vamsi\AppData\Local\Temp\claude\a ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\httpx2\_transports\default.py", line 
+95, in map_httpcore_exceptions
+    yield
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\httpx2\_transports\default.py", line 
+242, in handle_request
+    resp = self._pool.handle_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\httpcore2\_sync\connection_pool.py", 
+line 243, in handle_request
+    raise exc from None
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\httpcore2\_sync\connection_pool.py", 
+line 225, in handle_request
+    response = connection.handle_request(pool_request.request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\httpcore2\_sync\connection.py", line 
+98, in handle_request
+    return self._connection.handle_request(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\httpcore2\_sync\http11.py", line 125, 
+in handle_request
+    raise exc
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\httpcore2\_sync\http11.py", line 97, 
+in handle_request
+    ) = self._receive_response_headers(**kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\httpcore2\_sync\http11.py", line 167, 
+in _receive_response_headers
+    event = self._receive_event(timeout=timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\httpcore2\_sync\http11.py", line 200, 
+in _receive_event
+    data = self._network_stream.read(self.READ_NUM_BYTES, timeout=timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\httpcore2\_backends\sync.py", line 
+126, in read
+    with map_exceptions(exc_map):
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Vamsi\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\httpcore2\_exceptions.py", line 16, 
+in map_exceptions
+    raise to_exc(exc) from exc
+httpcore2.ReadTimeout: timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Vamsi\AppData\Local\Temp\claude\aea8ffcb8f1d25d9\a7f6f1bf-3dad-4665-9462-bbb6367388d3\scratchpad\diag_
+two_workers.py", line 146, in <module>
+    if one_round(r):
+       ^^^^^^^^^^^^
+  File "C:\Users\Vamsi\AppData\Local\Temp\claude\aea8ffcb8f1d25d9\a7f6f1bf-3dad-4665-9462-bbb6367388d3\scratchpad\diag_
+two_workers.py", line 64, in one_round
+    producer.send(records[m][n], flush=False)
+  File "C:\projects\project1\points-posting-investigator\app\pipeline\producer.py", line 109, in send
+    value = self._serialize(record, SerializationContext(self.topic, MessageField.VALUE))
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\
+avro.py", line 399, in __call__
+    return self.__serialize(obj, ctx)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\
+avro.py", line 405, in __serialize
+    return self.__serialize_impl(obj, ctx)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\
+avro.py", line 457, in __serialize_impl
+    registered_schema = self._registry.register_schema_full_response(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\
+schema_registry_client.py", line 786, in register_schema_full_response
+    response = self._rest_client.post(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\
+schema_registry_client.py", line 470, in post
+    return self.send_request(url, method='POST', body=body)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\
+schema_registry_client.py", line 537, in send_request
+    raise e
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\
+schema_registry_client.py", line 525, in send_request
+    response = self.send_http_request(base_url, url, method, headers, body_str, query)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\
+schema_registry_client.py", line 594, in send_http_request
+    response = self.session.request(
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\httpx2\_client.py", line 791, in 
+request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\httpx2\_client.py", line 974, in send
+    response = self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\httpx2\_client.py", line 1002, in 
+_send_handling_auth
+    response = self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\httpx2\_client.py", line 1037, in 
+_send_handling_redirects
+    response = self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\httpx2\_client.py", line 1070, in 
+_send_single_request
+    response = transport.handle_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\httpx2\_transports\default.py", line 
+241, in handle_request
+    with map_httpcore_exceptions():
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Vamsi\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "C:\projects\project1\points-posting-investigator\.venv\Lib\site-packages\httpx2\_transports\default.py", line 
+112, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx2.ReadTimeout: timed out

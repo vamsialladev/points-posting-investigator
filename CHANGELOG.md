@@ -58,4 +58,27 @@ All notable changes to this project are documented here. The format follows
     - dead letters with the original bytes and failure headers
     - `/metrics`
   - the `posting` service in the core compose stack
+- Milestone 2, PR-B2b: parking and the retry worker (ADR-0016):
+  - migration `0003`: the `parked_event` table (original bytes, status, attempts, transient failures, lease), with
+    check constraints; `posting_app` can't delete or rewrite a parked event
+  - the posting service parks a failed event, and every later event of the same member, instead of blocking the
+    partition
+  - `app/pipeline/retry.py`:
+    - each member's oldest parked event first (`FOR UPDATE SKIP LOCKED` plus a lease)
+    - exponential backoff
+    - permanent failures dead-lettered after 5 attempts with the original bytes; transient ones never
+  - the `retry-worker` service in the core compose stack
+  - the retry topics (`stay.checked_out.retry.1/2/3`) removed
+  - a failed offset commit (after the database commit) is a warning plus the
+    `posting_offset_commit_failures_total{error}` metric, and the consumer keeps going; the redelivery is a duplicate
+  - Kafka's test-only `FAULTS` listener (`127.0.0.1:19093`) for the producer fault tests
+  - `scripts\repeat_tests.ps1` keeps every run's full output, one line per test, and flags runs on a busy machine
+    (not counted); `scripts\quiet_check.ps1` checks that CPU load is low before a batch
+
+### Fixed
+- The checkout producer could lose an event silently: `send()` returned before Kafka answered, and `flush()` only
+  checked the queue. Every send now has a delivery callback, and `flush()` raises `DeliveryFailed` for any error or
+  missing report. The producer uses idempotence, `acks=all`, the gapless guarantee and a bounded delivery timeout
+  (ADR-0017; incident `docs/incidents/2026-11-26-producer-silent-loss.md`). Found by a repeat run of the two-workers
+  test (6 events posted that should have parked).
 - Kafka advertises `127.0.0.1` instead of `localhost`. The template uses `127.0.0.1` for Kafka and the registry.

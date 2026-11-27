@@ -1,0 +1,147 @@
+"""Diagnose two-workers run 3: 60 events, each member's first one made to fail once, so all 60 should PARK.
+
+Runs the consumer phase of tests/test_parking_kafka.py::test_two_workers_never_claim... against separate `diag_`
+roles, databases and topics, and records, for every message handled: when, partition, offset, member, stay, the
+outcome, and what the store answered at that moment. Repeats until an event is POSTED, or for N rounds. Prints
+evidence only: no secret values.
+
+    uv run python <this file> [rounds]
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import secrets
+import sys
+import threading
+import time
+import uuid
+from pathlib import Path
+
+ROOT = Path(r"C:\projects\project1\points-posting-investigator")
+sys.path.insert(0, str(ROOT))
+
+from confluent_kafka.admin import AdminClient  # noqa: E402
+from confluent_kafka.schema_registry import SchemaRegistryClient  # noqa: E402
+from dotenv import dotenv_values  # noqa: E402
+from sqlalchemy import create_engine, text  # noqa: E402
+from sqlalchemy.engine import make_url  # noqa: E402
+
+from app.db.bootstrap import bootstrap, conninfo  # noqa: E402
+from app.db.roles import PASSWORD_VARIABLES, Database, runtime_url  # noqa: E402
+from app.pipeline import topics  # noqa: E402
+from app.pipeline.posting import IncomingMessage, Outcome  # noqa: E402
+from tests.pipeline_fixtures import stay  # noqa: E402
+from tests.posting_helpers import FlakyLedger, checkout_producer, ledger_server, make_loop, make_service  # noqa: E402
+
+logging.basicConfig(level=logging.WARNING, stream=sys.stderr, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+env = dotenv_values(ROOT / ".env")
+admin = make_url(env["DATABASE_URL"])
+KAFKA = (env.get("KAFKA_BOOTSTRAP_SERVERS") or "127.0.0.1:9092").replace("localhost", "127.0.0.1")
+registry = SchemaRegistryClient({"url": "http://127.0.0.1:8081", "timeout": 10, "max.retries": 2})
+PREFIX = "diag_"
+POSTING, LEDGER = Database("posting", PREFIX), Database("ledger", PREFIX)
+
+
+def one_round(round_no: int) -> bool:
+    passwords = {v: secrets.token_urlsafe(18) for v in PASSWORD_VARIABLES}
+    bootstrap(admin, passwords, prefix=PREFIX, reset=True)
+    host = {"host": admin.host or "localhost", "port": admin.port or 5432}
+    posting_engine = create_engine(runtime_url(POSTING, passwords["POSTING_DB_PASSWORD"], **host), pool_size=10)
+    ledger_engine = create_engine(runtime_url(LEDGER, passwords["LEDGER_DB_PASSWORD"], **host), pool_size=10)
+    tag = uuid.uuid4().hex[:8]
+    names = {"input": f"diag.in.{tag}", "output": f"diag.out.{tag}", "dlq": f"diag.dlq.{tag}"}
+    topics.ensure_topics(KAFKA, tuple(topics.TopicSpec(n) for n in names.values()))
+
+    members = [f"GR-{m:05d}" for m in range(1, 13)]
+    records = {m: [stay(m, i * 100 + n) for n in range(1, 6)] for i, m in enumerate(members, start=1)}
+    first_stay = {records[m][0]["stay_id"]: m for m in members}
+    by_event = {r["event_id"]: (m, k + 1) for m in members for k, r in enumerate(records[m])}
+    producer = checkout_producer(KAFKA, registry, names["input"])
+    for n in range(5):
+        for m in members:
+            producer.send(records[m][n], flush=False)
+    producer.flush()
+
+    token = secrets.token_urlsafe(18)
+    seen: list[dict] = []
+    lock = threading.Lock()
+    with ledger_server(ledger_engine, token) as url:
+        flaky_holder: dict = {}
+
+        def wrap(client):
+            flaky_holder["f"] = FlakyLedger(client, {s: 1 for s in first_stay})
+            return flaky_holder["f"]
+
+        service = make_service(posting_engine, url, token, KAFKA, registry, names["output"], names["dlq"], wrap=wrap)
+        store = service.store
+        original_has_parked = store.member_has_parked
+        original_handle = service.handle
+
+        def has_parked(member: str) -> bool:
+            answer = original_has_parked(member)
+            with lock:
+                seen.append({"t": time.monotonic(), "kind": "member_has_parked", "member": member, "answer": answer})
+            return answer
+
+        def handle(message: IncomingMessage):
+            started = time.monotonic()
+            outcome = original_handle(message)
+            event_id = message.headers.get("event_id", "?")
+            member, position = by_event.get(event_id, ("?", 0))
+            with lock:
+                seen.append(
+                    {
+                        "t": started,
+                        "kind": "handled",
+                        "partition": message.partition,
+                        "offset": message.offset,
+                        "member": member,
+                        "position": position,
+                        "outcome": str(outcome),
+                    }
+                )
+            return outcome
+
+        store.member_has_parked = has_parked  # type: ignore[method-assign]
+        service.handle = handle  # type: ignore[method-assign]
+        loop = make_loop(service, KAFKA, "diag-" + tag, names["input"])
+        handled, deadline = 0, time.monotonic() + 300
+        outcomes: list[str] = []
+        while handled < 60 and time.monotonic() < deadline:
+            outcome = loop.run_once(timeout=0.5)
+            if outcome is not None:
+                outcomes.append(str(outcome))
+                if outcome is not Outcome.RETRY:
+                    handled += 1
+        loop.consumer.close()
+        left = dict(flaky_holder["f"].left)
+
+    with posting_engine.connect() as conn:
+        parked = [dict(r._mapping) for r in conn.execute(text(
+            "SELECT id, event_id, member_number, stay_id, status, error_class, transient_failures, parked_at FROM parked_event ORDER BY id"))]
+        posted = [dict(r._mapping) for r in conn.execute(text(
+            "SELECT event_id, member_number, stay_id, posted_at FROM posting ORDER BY posted_at"))]
+    AdminClient({"bootstrap.servers": KAFKA}).delete_topics(list(names.values()), operation_timeout=30)
+    posting_engine.dispose()
+    ledger_engine.dispose()
+
+    counts = {o: outcomes.count(o) for o in set(outcomes)}
+    anomaly = counts.get("posted", 0) > 0 or handled < 60
+    print(f"round {round_no}: handled {handled}/60 in {len([s for s in seen if s['kind']=='handled'])} handle calls; outcomes {counts}; "
+          f"flaky counters left non-zero: {sum(1 for v in left.values() if v)}")
+    if anomaly:
+        out = Path(r"C:\Users\Vamsi\AppData\Local\Temp\claude\aea8ffcb8f1d25d9\a7f6f1bf-3dad-4665-9462-bbb6367388d3\scratchpad") / f"diag_round{round_no}.json"
+        out.write_text(json.dumps({"seen": seen, "parked": parked, "posted": posted, "outcomes": outcomes,
+                                   "flaky_left": left, "first_stays": first_stay}, default=str, indent=1), encoding="utf-8")
+        print(f"  ANOMALY: evidence saved to {out}")
+        for row in posted:
+            print(f"  posted directly: member {row['member_number']} stay {row['stay_id']}")
+    return anomaly
+
+
+rounds = int(sys.argv[1]) if len(sys.argv) > 1 else 5
+for r in range(1, rounds + 1):
+    if one_round(r):
+        break
