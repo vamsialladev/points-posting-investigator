@@ -38,10 +38,10 @@ These are the only statuses used in `docs/requirements-matrix.md`:
 
 Plus `Planned (M#)` for a v1 requirement no milestone has reached, and `Planned (v2)` for "what's next".
 
-## Counts (from `docs/requirements-matrix.md`, 2026-11-24)
+## Counts (from `docs/requirements-matrix.md`, 2026-11-27)
 `tests/test_repo_guidance.py::test_status_counts_match_the_matrix` keeps this table honest.
 
 | Release | Rows | Implemented and verified | Manual step required | Planned |
 |---|---|---|---|---|
-| v1 | 142 | 39 | 0 | 103 |
+| v1 | 142 | 44 | 0 | 98 |
 | v2 | 32 | 0 | 0 | 32 |
