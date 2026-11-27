@@ -4,19 +4,24 @@
 
 For each message:
 1. Decode (Avro, via the registry) and validate. Anything that can never post is dead-lettered at once: undecodable,
-   unknown schema version, a bad field, a correction (until PR-C), or a ledger 409 (the stay revision was credited
-   with different points). The original bytes go to the DLQ topic with the failure headers of RFC-0001 D8.
+   unknown schema version, a bad field, or a ledger 409 (the stay revision was credited with different points). The
+   original bytes go to the DLQ topic with the failure headers of RFC-0001 D8.
 2. Skip it if this event, or this stay revision, is already posted, or this event is already parked (a redelivery).
 3. If the member has parked events, **park this one behind them** (ADR-0016). Per-member order holds without
    blocking the partition.
-4. Credit the ledger with the business key `stay_id:revision`. The ledger is a separate system of record. Its
+4. Plan the credit from the stay's latest posted revision (D10, `events.plan_credit`):
+   - an original: the stay's points; a correction: the signed difference from the latest posted revision
+   - a revision at or below the latest posted one: recorded in `skipped_event`, not credited (outcome SKIPPED)
+   - a correction with nothing posted for its stay: parked as `original_missing`, retried, dead-lettered at the max
+5. Credit the ledger with the business key `stay_id:revision`. The ledger is a separate system of record. Its
    UNIQUE(idempotency_key) gives every retry the same entry back, so it is outside the transaction on purpose.
    - A transient failure (5xx, timeout, 429, 401) parks the event; it never counts toward dead-lettering.
    - Another 4xx parks it with `attempts = 1`. The retry worker dead-letters it at the maximum.
-5. **One Postgres transaction** inserts the posting row (`ON CONFLICT DO NOTHING`) and, only if that row is new, the
+6. **One Postgres transaction** inserts the posting row (`ON CONFLICT DO NOTHING`) and, only if that row is new, the
    outbox row for `points.posted`, carrying the trace context. Both commit, or neither does. When the retry worker
    posts a parked event, marking it `done` is part of the same transaction.
-6. Commit the Kafka offset, **only after** step 5 (or the park) committed: a synchronous commit of exactly this message.
+7. Commit the Kafka offset, **only after** step 6 (or the park, or the skip) committed: a synchronous commit of
+   exactly this message.
 
 If the database fails, or the dead-letter topic can't be reached, the offset isn't committed. Parking needs the
 database too. The consumer seeks back to the same message and retries after a growing, jittered wait, so that
@@ -46,9 +51,19 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.pipeline import topics, trace
-from app.pipeline.events import InvalidEvent, StayEvent, ledger_key, points_for, validate
+from app.pipeline.events import (
+    CreditKind,
+    CreditPlan,
+    InvalidEvent,
+    LatestPosting,
+    StayEvent,
+    ledger_key,
+    plan_credit,
+    points_for,
+    validate,
+)
 from app.pipeline.ledger_client import LedgerClient, LedgerPermanent, LedgerTransient
-from app.pipeline.tables import PARKED_OPEN, outbox, parked_event, posting
+from app.pipeline.tables import PARKED_OPEN, outbox, parked_event, posting, skipped_event
 
 log = logging.getLogger("posting")
 
@@ -58,6 +73,7 @@ class Outcome(StrEnum):
     DUPLICATE = "duplicate"
     DEAD_LETTERED = "dead_lettered"
     PARKED = "parked"
+    SKIPPED = "skipped"  # a stale stay revision: recorded, not credited (D10)
     RETRY = "retry"
 
 
@@ -191,6 +207,10 @@ class Store(Protocol):
 
     def park(self, message: IncomingMessage, event: StayEvent, reason: ParkReason, delay: float) -> bool: ...
 
+    def latest_posting(self, stay_id: str) -> LatestPosting | None: ...
+
+    def record_skipped(self, event: StayEvent, plan: CreditPlan) -> bool: ...
+
     def write(
         self,
         event: StayEvent,
@@ -198,11 +218,15 @@ class Store(Protocol):
         trace_context: Mapping[str, str],
         fault: Callable[[str], None] | None = None,
         parked: tuple[str, int] | None = None,
+        credited: int | None = None,
     ) -> bool: ...
 
 
-def outbox_payload(event: StayEvent, entry_id: str, now: datetime | None = None) -> dict[str, Any]:
-    """The `points.posted` record. Its `event_id` is fixed here, so a re-published outbox row keeps it."""
+def outbox_payload(
+    event: StayEvent, entry_id: str, now: datetime | None = None, credited: int | None = None
+) -> dict[str, Any]:
+    """The `points.posted` record. Its `event_id` is fixed here, so a re-published outbox row keeps it.
+    `credited` is what the ledger got: the whole stay for an original, the difference for a correction (D10)."""
     points = points_for(event)
     return {
         "event_id": str(uuid.uuid4()),
@@ -213,7 +237,7 @@ def outbox_payload(event: StayEvent, entry_id: str, now: datetime | None = None)
         "stay_id": event.stay_id,
         "revision": event.revision,
         "stay_points": points,
-        "credited_points": points,  # revision 1 only: the whole stay (corrections credit a difference, PR-C)
+        "credited_points": points if credited is None else credited,
         "posted_at": int((now or datetime.now(UTC)).timestamp() * 1000),
         "correlation_id": event.correlation_id,
     }
@@ -237,6 +261,42 @@ class PostingStore:
 
     def member_has_parked(self, member_number: str) -> bool:
         return self._exists((parked_event.c.member_number == member_number) & parked_event.c.status.in_(PARKED_OPEN))
+
+    def latest_posting(self, stay_id: str) -> LatestPosting | None:
+        """The stay's highest posted revision and the points it earns, or None if nothing is posted for it."""
+        try:
+            with self.engine.connect() as conn:
+                row = conn.execute(
+                    select(posting.c.revision, posting.c.stay_points)
+                    .where(posting.c.stay_id == stay_id)
+                    .order_by(posting.c.revision.desc())
+                    .limit(1)
+                ).first()
+        except SQLAlchemyError as exc:
+            raise DatabaseFailure(type(exc).__name__) from exc
+        return None if row is None else LatestPosting(int(row.revision), int(row.stay_points))
+
+    def record_skipped(self, event: StayEvent, plan: CreditPlan) -> bool:
+        """Record a stale revision (once per event ID). False if this event was recorded before (a redelivery)."""
+        try:
+            with self.engine.begin() as conn:
+                row = conn.execute(
+                    insert(skipped_event)
+                    .values(
+                        event_id=event.event_id,
+                        stay_id=event.stay_id,
+                        revision=event.revision,
+                        member_number=event.member_number,
+                        reason="stale_revision",
+                        latest_revision=plan.latest_revision,
+                        correlation_id=event.correlation_id,
+                    )
+                    .on_conflict_do_nothing(index_elements=["event_id"])
+                    .returning(skipped_event.c.event_id)
+                ).first()
+        except SQLAlchemyError as exc:
+            raise DatabaseFailure(type(exc).__name__) from exc
+        return row is not None
 
     def _exists(self, condition: Any) -> bool:
         try:
@@ -286,11 +346,14 @@ class PostingStore:
         trace_context: Mapping[str, str],
         fault: Callable[[str], None] | None = None,
         parked: tuple[str, int] | None = None,
+        credited: int | None = None,
     ) -> bool:
         """The one transaction: the posting row; only if it is new, its outbox row; and with `parked`
         (worker ID, parked event ID), that parked event marked done. Returns whether the posting was new.
-        A worker whose claim was taken over raises LeaseLost, and nothing is written."""
+        A worker whose claim was taken over raises LeaseLost, and nothing is written.
+        `credited`: what the ledger was asked for (the difference for a correction); default the stay's points."""
         points = points_for(event)
+        credited = points if credited is None else credited
         try:
             with self.engine.begin() as conn:
                 new = conn.execute(
@@ -301,7 +364,7 @@ class PostingStore:
                         revision=event.revision,
                         member_number=event.member_number,
                         stay_points=points,
-                        credited_points=points,
+                        credited_points=credited,
                         ledger_entry_id=entry_id,
                         correlation_id=event.correlation_id,
                     )
@@ -329,7 +392,7 @@ class PostingStore:
                     insert(outbox).values(
                         topic=self.output_topic,
                         message_key=event.member_number,
-                        payload=outbox_payload(event, entry_id),
+                        payload=outbox_payload(event, entry_id, credited=credited),
                         headers={
                             "correlation_id": event.correlation_id,
                             "schema_version": "1",
@@ -381,10 +444,19 @@ class PostingService:
             return Outcome.DUPLICATE
         if self.store.member_has_parked(event.member_number):
             return self._park(message, event, ParkReason("behind"), delay=0.0)
+        plan = plan_credit(event, self.store.latest_posting(event.stay_id))
+        if plan.kind == CreditKind.STALE:
+            if not self.store.record_skipped(event, plan):
+                return Outcome.DUPLICATE
+            log.info("skipped stale revision %s of %s (latest %s)", event.revision, event.stay_id, plan.latest_revision)
+            return Outcome.SKIPPED
+        if plan.kind == CreditKind.ORIGINAL_MISSING:
+            reason = ParkReason("permanent", "original_missing", f"no posting for {event.stay_id} yet")
+            return self._park(message, event, reason, self._first_delay(None))
         try:
             with self.metrics.ledger_seconds.time():
                 credit = self.ledger.credit(
-                    ledger_key(event), event.member_number, event.stay_id, points_for(event), event.correlation_id
+                    ledger_key(event), event.member_number, event.stay_id, plan.credited_points, event.correlation_id
                 )
         except LedgerTransient as unavailable:
             reason = ParkReason("transient", f"ledger_{unavailable.reason}", str(unavailable))
@@ -397,7 +469,7 @@ class PostingService:
         self._fault("after_ledger_credit")
         incoming = trace.context_from_headers(message.headers)
         context = {**incoming, "traceparent": trace.child(incoming.get("traceparent"))}  # this service's span
-        inserted = self.store.write(event, credit.entry_id, context, fault=self.fault)
+        inserted = self.store.write(event, credit.entry_id, context, fault=self.fault, credited=plan.credited_points)
         return Outcome.POSTED if inserted else Outcome.DUPLICATE
 
     def _first_delay(self, retry_after: float | None) -> float:

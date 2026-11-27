@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import random
 import sys
 import uuid
 from collections.abc import Callable
@@ -208,23 +207,14 @@ class CheckoutProducer:
 
 
 def synthetic_events(count: int, seed: int) -> list[dict[str, Any]]:
-    """Synthetic checkouts for the demo (the load generator with rates comes in PR-C)."""
-    rng = random.Random(seed)  # noqa: S311 (synthetic data, not security)
-    events = []
-    for n in range(count):
-        prefix = rng.choice(["BR", "ML"])
-        events.append(
-            build_event(
-                member_number=f"GR-{rng.randint(1, 500):05d}",
-                stay_id=f"{prefix}-{rng.randint(1, 9999):04d}",
-                check_in=date(2026, 11, 1) + timedelta(days=n % 20),
-                nights=rng.randint(1, 5),
-                room_rate_cents=rng.randint(9_000, 60_000),
-                taxes_cents=rng.randint(0, 6_000),
-                fees_cents=rng.choice([0, 2_500, 3_000]),
-            )
-        )
-    return events
+    """Synthetic checkouts for the demo: distinct stays, the same events for the same seed (`seed.stays`). Rates,
+    corrections and duplicates: `python -m app.pipeline.loadgen`.
+
+    PR-C fixed this: it used to draw stay IDs at random, so two members could share one, and the second stay was then
+    taken for a duplicate (`UNIQUE(stay_id, revision)`) and refused by the ledger (409)."""
+    from app.pipeline import seed as seeds  # seed.py uses build_event from this module
+
+    return seeds.stays(count, seed)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -236,7 +226,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args(argv)
     if not 1 <= args.count <= 1000:
-        raise SystemExit("--count must be between 1 and 1000 (the load generator in PR-C does rates)")
+        raise SystemExit("--count must be between 1 and 1000 (for rates and more: python -m app.pipeline.loadgen)")
     bootstrap = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "127.0.0.1:9092").replace("localhost", "127.0.0.1")
     registry = SchemaRegistryClient({"url": os.environ.get("SCHEMA_REGISTRY_URL", "http://127.0.0.1:8081")})
     producer = CheckoutProducer(make_checkout_producer(bootstrap), registry)

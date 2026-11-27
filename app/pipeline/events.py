@@ -22,7 +22,7 @@ POINTS_PER_DOLLAR = 10
 
 
 class InvalidEvent(Exception):
-    """An event that can never be posted. `code`: schema, schema_version, invalid_field, unsupported_revision."""
+    """An event that can never be posted. `code`: schema, schema_version, invalid_field."""
 
     def __init__(self, code: str, detail: str) -> None:
         super().__init__(f"{code}: {detail}")
@@ -78,9 +78,7 @@ def validate(record: Mapping[str, Any], headers: Mapping[str, str]) -> StayEvent
     _require(event.room_rate_cents >= 0 and event.taxes_cents >= 0 and event.fees_cents >= 0, "negative money")
     _require(event.currency == "USD", "only USD earns points")
     _require(bool(event.correlation_id), "correlation_id is required")
-    if event.revision != 1:
-        # Corrections (revision > 1) need RFC-0001 D10's difference rule, which PR-C builds.
-        raise InvalidEvent("unsupported_revision", f"revision {event.revision} isn't supported yet")
+    _require(event.revision >= 1, "revision must be at least 1")  # 1 = the original, higher = a correction (D10)
     return event
 
 
@@ -92,3 +90,48 @@ def points_for(event: StayEvent) -> int:
 def ledger_key(event: StayEvent) -> str:
     """The ledger's idempotency key: one credit per stay revision, whatever event ID it arrives under (ADR-0015)."""
     return f"{event.stay_id}:{event.revision}"
+
+
+# ---------- corrections (RFC-0001 D10) ----------
+
+
+@dataclass(frozen=True)
+class LatestPosting:
+    """The highest revision of a stay that has been posted, and the points that revision earns."""
+
+    revision: int
+    stay_points: int
+
+
+class CreditKind:
+    CREDIT = "credit"  # credit `credited_points` under ledger_key(event)
+    STALE = "stale"  # an older (or equal) revision than one already posted: recorded and skipped
+    ORIGINAL_MISSING = "original_missing"  # a correction whose stay has nothing posted yet: retried, then DLQ
+
+
+@dataclass(frozen=True)
+class CreditPlan:
+    kind: str
+    credited_points: int = 0
+    latest_revision: int | None = None
+
+
+def plan_credit(event: StayEvent, latest: LatestPosting | None) -> CreditPlan:
+    """What to credit for this event, given the stay's latest posted revision (D10). Pure, so every case is unit-tested.
+
+    - an original (revision 1) with nothing posted: the whole stay's points
+    - a correction: the signed difference from the latest posted revision, which can be zero or negative
+    - any revision at or below the latest posted one: stale, skipped
+    - a correction with nothing posted for its stay: original_missing
+
+    A redelivered event gets the same plan while nothing newer is posted, so its ledger request (same key, same points)
+    is a replay, not a second credit. Events of one stay share a member, so they're handled in order (ADR-0016).
+    """
+    points = points_for(event)
+    if latest is None:
+        if event.revision == 1:
+            return CreditPlan(CreditKind.CREDIT, points)
+        return CreditPlan(CreditKind.ORIGINAL_MISSING)
+    if event.revision <= latest.revision:
+        return CreditPlan(CreditKind.STALE, 0, latest.revision)
+    return CreditPlan(CreditKind.CREDIT, points - latest.stay_points, latest.revision)

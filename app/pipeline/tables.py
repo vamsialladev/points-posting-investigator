@@ -123,3 +123,19 @@ parked_event = Table(
     ),
     Index("parked_due_idx", "next_attempt_at", postgresql_where=text("status = 'pending'")),
 )
+
+# Skipped events (migration 0004, RFC-0001 D10): a stay revision at or below one already posted is recorded here and
+# not credited. Keyed by event ID, so a redelivery records nothing new. Queryable for the investigator (M6).
+skipped_event = Table(
+    "skipped_event",
+    metadata,
+    Column("event_id", Text, primary_key=True),
+    Column("stay_id", Text, nullable=False),
+    Column("revision", Integer, nullable=False),
+    Column("member_number", Text, nullable=False),
+    Column("reason", Text, nullable=False),
+    Column("latest_revision", Integer),
+    Column("correlation_id", Text, nullable=False),
+    Column("skipped_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    CheckConstraint("reason IN ('stale_revision')", name="skipped_reason_known"),
+)
