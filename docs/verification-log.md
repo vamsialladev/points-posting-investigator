@@ -1,7 +1,20 @@
 # Verification log
 
 Real results only, newest milestone first. Each row: what was checked, the exact command, and the result. Tool: Claude
-Code (Opus 5.5) did all of Milestone 1 and Milestone 2 so far.
+Code (Opus 5.5) did all of Milestone 1 and Milestone 2. Claude Code (Fable 5.2) does Milestone 3 onwards (RFC-0002).
+
+## Milestone 3, Phase 1: the plan and the pre-registration (2026-11-27)
+RFC-0002, approved by the owner on 2026-11-27 (ADR-0019). Branch `m3/plan-and-preregistration`. Documents and one
+test file; no code under `app/`. Local only, $0, no AI, no stack run.
+
+| # | Check | Command | Result |
+|---|---|---|---|
+| 1 | State before any change | `scripts\test.ps1` on `main` at `6b680d4` (`.test-logs\m3-plan-session-offline.txt`, local) | ruff, format and mypy clean; **358 passed, 68 skipped** (the real-stack tests); coverage 81.69% |
+| 2 | The order test fails before the commit exists | `uv run pytest tests/test_preregistration.py` with the files staged, not committed | 14 passed, **1 failed**: `test_preregistration_is_committed_before_any_arm_or_investigator_code`, "benchmarks/preregistration.lock.json is not committed" and 4 more |
+| 3 | The pre-registration commit | `git log --oneline -2` | `49dc098` RFC-0002 and ADR-0019; `4828940` the catalog, hypotheses, protocol, thresholds, lock and test. Nothing exists under `app/arms/` or `app/investigator/` |
+| 4 | Full offline suite after the commit | `scripts\test.ps1` (`.test-logs\m3-phase1-offline.txt`, local) | ruff, format and mypy clean; **373 passed, 68 skipped**; coverage 81.69% (15 new tests, all in `tests/test_preregistration.py`) |
+| 5 | The order check can fail | the 7 throwaway-repository tests in `tests/test_preregistration.py` | code before the pre-registration, both in one commit, an edit after the code, nothing pre-registered, an edit without a new lock, and a shallow clone each produce the expected problems; the right order produces none |
+| 6 | The catalog against the code | read `app/pipeline/ledger_client.py`, `posting.py`, `retry.py` | the error classes in the catalog are the ones the code writes: `ledger_timeout_not_found`, `ledger_rate_limited`, `ledger_unauthorized`, `ledger_rejected_422`, `original_missing`, `schema`, `schema_version`. Not yet seen on a real stack run: Phase 2 |
 
 ## Milestone 2, PR-C: corrections, seeds, the load generator, the schema gate (2026-11-27 onwards)
 Built under RFC-0001 as approved, adapted to parking (ADR-0018). Branch `m2/pr-c`, in its own worktree so B2b's batch

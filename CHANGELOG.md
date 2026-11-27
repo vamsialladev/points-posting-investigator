@@ -85,6 +85,17 @@ All notable changes to this project are documented here. The format follows
   - `app/pipeline/schema_check.py`: the schema gate (local structural check plus the registry), a step in CI
   - docs: `event-semantics.md`, `architecture.md`, `data-dictionary.md`, `scaling-and-limits.md`,
     `tech-debt-register.md`, `real-system-swap-guide.md`
+- Milestone 3, Phase 1 (RFC-0002, ADR-0019): the pre-registration, committed before any arm or investigator code:
+  - `docs/failure-catalog.md`: 18 scenarios with closed root-cause and recovery codes
+  - `docs/hypotheses.md` (H1 to H5), `benchmarks/thresholds.yaml`, `docs/benchmark-protocol.md` with the scoring
+    rubric
+  - `benchmarks/preregistration.lock.json` and `scripts/prereg_lock.py`: any later edit is a visible commit
+  - `tests/test_preregistration.py`: checks the lock, the thresholds against the document, and the git order; fails
+    on a shallow clone
+
+### Changed
+- CI's `checks` job fetches the full history, so the pre-registration order test can read it.
+- The ledger `members` table moves to v2 (ADR-0019).
 
 ### Fixed
 - `synthetic_events` could give two members the same stay ID, so the second stay was refused as a duplicate (PR-C).
