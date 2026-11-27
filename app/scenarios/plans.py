@@ -1,8 +1,9 @@
 """Each scenario's trigger and reset, built by pure code from (scenario, run, pair). No I/O.
 
 - **Deterministic:** the same arguments always give the same plan, event IDs included.
-- **Runs don't collide:** run `n` owns its own block of 50 members and 80 stays, so a new run behaves the same on a
-  stack that still holds earlier runs' rows. Nothing has to be deleted between runs.
+- **Runs don't collide:** every (scenario, run) pair owns its own block of 50 members and 80 stays, so a new run
+  behaves the same on a stack that still holds other runs' and other scenarios' rows. Nothing has to be deleted
+  between runs.
 - **A reset restores every knob the trigger moved,** then waits until the pipeline is quiet.
 
 The numbers (how many events, which latency) are chosen so the failure shows within about two minutes on the local
@@ -50,7 +51,8 @@ MEMBERS_PER_RUN = 50
 STAYS_PER_RUN = 80  # 40 per property
 FIRST_MEMBER = 30_000  # GR-30000 upwards: apart from the seeds (GR-00001..) and the smoke tests (GR-0999x)
 FIRST_STAY = 100
-MAX_RUN = 246  # the last run whose stays still fit BR-/ML-####
+SCENARIO_SLOTS = 18  # one block per scenario inside each run
+MAX_RUN = 12  # the last run whose blocks still fit BR-/ML-#### (13 runs of 18 scenarios: 234 incidents)
 PART_MEMBERS = 25  # in a compound incident each part gets half the block
 PART_STAYS = 40
 
@@ -69,23 +71,28 @@ ALERT_POSTINGS_DROPPED = "postings_dropped"
 class Block:
     """The members, stays and event IDs one scenario (or one part of a compound incident) may use in one run."""
 
-    scenario: str
+    scenario: str  # the scenario that owns the block (S15 for both parts of a compound incident)
     run: int
     member_offset: int = 0
     stay_offset: int = 0
     members: int = MEMBERS_PER_RUN
     stays: int = STAYS_PER_RUN
 
+    @property
+    def slot(self) -> int:
+        """This (scenario, run)'s place in the sequence of blocks."""
+        return self.run * SCENARIO_SLOTS + sorted(catalog.SCENARIOS).index(self.scenario)
+
     def member(self, j: int) -> str:
         if not 0 <= j < self.members:
             raise ValueError(f"member {j} is outside this block of {self.members}")
-        return f"GR-{FIRST_MEMBER + self.run * MEMBERS_PER_RUN + self.member_offset + j:05d}"
+        return f"GR-{FIRST_MEMBER + self.slot * MEMBERS_PER_RUN + self.member_offset + j:05d}"
 
     def stay(self, i: int) -> str:
         if not 0 <= i < self.stays:
             raise ValueError(f"stay {i} is outside this block of {self.stays}")
         index = self.stay_offset + i
-        number = FIRST_STAY + self.run * (STAYS_PER_RUN // 2) + index // 2
+        number = FIRST_STAY + self.slot * (STAYS_PER_RUN // 2) + index // 2
         return f"{'BR' if index % 2 == 0 else 'ML'}-{number:04d}"
 
     def event(

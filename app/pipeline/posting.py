@@ -63,7 +63,7 @@ from app.pipeline.events import (
     points_for,
     validate,
 )
-from app.pipeline.ledger_client import LedgerClient, LedgerPermanent, LedgerTransient
+from app.pipeline.ledger_client import LedgerClient, LedgerPermanent, LedgerTransient, ledger_timeout
 from app.pipeline.tables import PARKED_OPEN, outbox, parked_event, posting, skipped_event
 
 log = logging.getLogger("posting")
@@ -616,7 +616,11 @@ def main() -> int:
 
     service = PostingService(
         PostingStore(engine),
-        LedgerClient(env.get("LEDGER_API_URL", "http://127.0.0.1:8020"), env.get("LEDGER_API_TOKEN", "")),
+        LedgerClient(
+            env.get("LEDGER_API_URL", "http://127.0.0.1:8020"),
+            env.get("LEDGER_API_TOKEN", ""),
+            timeout=ledger_timeout(env),
+        ),
         deserialize,
         DeadLetterPublisher(Producer({"bootstrap.servers": bootstrap, "acks": "all"}), topics.DLQ),
     )

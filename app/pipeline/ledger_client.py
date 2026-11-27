@@ -12,11 +12,25 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
+
+DEFAULT_TIMEOUT_SECONDS = 5.0
+
+
+def ledger_timeout(env: Mapping[str, str]) -> float:
+    """LEDGER_TIMEOUT_SECONDS, the client's timeout for one ledger request (5 s by default). Scenario S12 lowers it."""
+    raw = env.get("LEDGER_TIMEOUT_SECONDS", "") or str(DEFAULT_TIMEOUT_SECONDS)
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise ValueError("LEDGER_TIMEOUT_SECONDS must be a number of seconds") from exc
+    if not 0 < value <= 120:
+        raise ValueError("LEDGER_TIMEOUT_SECONDS must be above 0 and at most 120")
+    return value
 
 
 @dataclass(frozen=True)
@@ -45,7 +59,7 @@ class LedgerClient:
         base_url: str,
         token: str,
         *,
-        timeout: float = 5.0,
+        timeout: float = DEFAULT_TIMEOUT_SECONDS,
         settle_seconds: float = 0.5,
         lookups: int = 2,
         transport: httpx.BaseTransport | None = None,
