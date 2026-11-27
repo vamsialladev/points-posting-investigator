@@ -50,6 +50,7 @@ from sqlalchemy import Engine, exists, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.ops import logsink
 from app.pipeline import topics, trace
 from app.pipeline.events import (
     CreditKind,
@@ -591,6 +592,7 @@ def main() -> int:
     logging.basicConfig(
         level=os.environ.get("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(name)s %(message)s"
     )
+    logsink.install("posting")  # stored log lines for the investigator; off without OPS_DB_PASSWORD
     env = os.environ
     engine = create_engine(
         runtime_url(

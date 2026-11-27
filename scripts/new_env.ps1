@@ -23,6 +23,7 @@ $generated = [ordered]@{
     "LEDGER_DB_PASSWORD"        = 24
     "POSTING_DB_PASSWORD"       = 24
     "RELAY_DB_PASSWORD"         = 24
+    "OPS_DB_PASSWORD"           = 24
     "LEDGER_API_TOKEN"          = 24
     "GRAFANA_ADMIN_PASSWORD"    = 24
     "AUTOMATION_WEBHOOK_SECRET" = 48

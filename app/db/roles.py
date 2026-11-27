@@ -65,14 +65,29 @@ RUNTIME_ROLES: dict[str, tuple[RuntimeRole, ...]] = {
             },
         ),
     ),
+    # RFC-0002, ADR-0019: stored evidence. The services may only add log lines and alert evaluations. They can't
+    # read them back, change them or delete them, and can't touch the change feed, questions or runbooks.
+    "ops": (
+        RuntimeRole(
+            "app",
+            "OPS_DB_PASSWORD",
+            {
+                "TABLE log_event": "INSERT",
+                "SEQUENCE log_event_id_seq": "USAGE",
+                "TABLE alert_evaluation": "INSERT",
+                "SEQUENCE alert_evaluation_id_seq": "USAGE",
+            },
+        ),
+    ),
 }
 
-PASSWORD_VARIABLES = tuple(role.password_variable for roles in RUNTIME_ROLES.values() for role in roles)
+# In order, without repeats: several roles may share one variable.
+PASSWORD_VARIABLES = tuple(dict.fromkeys(role.password_variable for roles in RUNTIME_ROLES.values() for role in roles))
 
 
 @dataclass(frozen=True)
 class Database:
-    base: str  # posting | ledger
+    base: str  # ledger | posting | ops
     prefix: str = ""
 
     def __post_init__(self) -> None:

@@ -77,7 +77,7 @@ def test_the_posting_service_never_changes_an_outbox_row_and_the_relay_never_wri
 
 
 def test_every_runtime_role_has_its_own_password_variable():
-    assert PASSWORD_VARIABLES == ("LEDGER_DB_PASSWORD", "POSTING_DB_PASSWORD", "RELAY_DB_PASSWORD")
+    assert PASSWORD_VARIABLES == ("LEDGER_DB_PASSWORD", "POSTING_DB_PASSWORD", "RELAY_DB_PASSWORD", "OPS_DB_PASSWORD")
     assert Database("posting", "test_").role_name("relay") == "test_posting_relay"
     with pytest.raises(ValueError):
         Database("ledger").role_name("relay")

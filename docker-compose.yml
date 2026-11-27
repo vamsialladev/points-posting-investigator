@@ -118,6 +118,8 @@ services:
       LEDGER_DB_PASSWORD: ${LEDGER_DB_PASSWORD:?set LEDGER_DB_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
       POSTING_DB_PASSWORD: ${POSTING_DB_PASSWORD:?set POSTING_DB_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
       RELAY_DB_PASSWORD: ${RELAY_DB_PASSWORD:?set RELAY_DB_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
+      OPS_DB_PASSWORD: ${OPS_DB_PASSWORD:?set OPS_DB_PASSWORD in .env (scripts
+ew_env.ps1 -AddMissing)}
     depends_on:
       db:
         condition: service_healthy
@@ -139,6 +141,8 @@ services:
     environment:
       LEDGER_API_TOKEN: ${LEDGER_API_TOKEN:?set LEDGER_API_TOKEN in .env}
       LEDGER_DB_PASSWORD: ${LEDGER_DB_PASSWORD:?set LEDGER_DB_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
+      OPS_DB_PASSWORD: ${OPS_DB_PASSWORD:?set OPS_DB_PASSWORD in .env (scripts
+ew_env.ps1 -AddMissing)}
       POSTGRES_HOST: db
       LEDGER_HOST: 0.0.0.0
       LEDGER_CONTROL_ENABLED: "true"  # local stack only; PUBLIC_DEMO_MODE=true turns it off
@@ -164,6 +168,8 @@ services:
     command: [python, -m, app.pipeline.posting]
     environment:
       POSTING_DB_PASSWORD: ${POSTING_DB_PASSWORD:?set POSTING_DB_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
+      OPS_DB_PASSWORD: ${OPS_DB_PASSWORD:?set OPS_DB_PASSWORD in .env (scripts
+ew_env.ps1 -AddMissing)}
       POSTGRES_HOST: db
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SCHEMA_REGISTRY_URL: http://schema-registry:8081
@@ -197,6 +203,8 @@ services:
     command: [python, -m, app.pipeline.retry]
     environment:
       POSTING_DB_PASSWORD: ${POSTING_DB_PASSWORD:?set POSTING_DB_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
+      OPS_DB_PASSWORD: ${OPS_DB_PASSWORD:?set OPS_DB_PASSWORD in .env (scripts
+ew_env.ps1 -AddMissing)}
       POSTGRES_HOST: db
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SCHEMA_REGISTRY_URL: http://schema-registry:8081
@@ -231,6 +239,8 @@ services:
     command: [python, -m, app.pipeline.relay]
     environment:
       RELAY_DB_PASSWORD: ${RELAY_DB_PASSWORD:?set RELAY_DB_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
+      OPS_DB_PASSWORD: ${OPS_DB_PASSWORD:?set OPS_DB_PASSWORD in .env (scripts
+ew_env.ps1 -AddMissing)}
       POSTGRES_HOST: db
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SCHEMA_REGISTRY_URL: http://schema-registry:8081

@@ -47,6 +47,7 @@ from sqlalchemy import Engine, bindparam, text
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.types import BigInteger
 
+from app.ops import logsink
 from app.pipeline import trace
 
 log = logging.getLogger("relay")
@@ -457,6 +458,7 @@ def main() -> int:
     logging.basicConfig(
         level=os.environ.get("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(name)s %(message)s"
     )
+    logsink.install("relay")  # stored log lines for the investigator; off without OPS_DB_PASSWORD
     env = os.environ
     database = Database("posting", env.get("DB_PREFIX", ""))
     engine = create_engine(
