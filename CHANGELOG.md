@@ -92,6 +92,11 @@ All notable changes to this project are documented here. The format follows
   - `benchmarks/preregistration.lock.json` and `scripts/prereg_lock.py`: any later edit is a visible commit
   - `tests/test_preregistration.py`: checks the lock, the thresholds against the document, and the git order; fails
     on a shallow clone
+- Milestone 3, Phase 2, offline parts (RFC-0002):
+  - `app/scenarios/`: the 18 scenarios' trigger and reset plans as deterministic data, and
+    `python -m app.scenarios list|plan`. The executor that runs them comes next
+  - `app/ops/lag.py`: consumer lag from committed offsets and watermarks, with a read-only reader
+  - `ops/alert-rules.yaml` and `app/ops/alerts.py`: alert rules as data and a deterministic evaluator
 
 ### Changed
 - CI's `checks` job fetches the full history, so the pre-registration order test can read it.
