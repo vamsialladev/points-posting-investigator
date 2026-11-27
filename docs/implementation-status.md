@@ -1,7 +1,7 @@
 # Implementation status
 
 - **Last updated:** 2026-11-27
-- **Current milestone:** 2, complete when PR-C (#9) merges. PR-A (#3), PR-B1 (#5), PR-B2a (#6) and PR-B2b (#8) are merged
+- **Current milestone:** 2 complete (2026-11-27): PR-A (#3), PR-B1 (#5), PR-B2a (#6), PR-B2b (#8), PR-C (#9), all merged with green CI. M3 not started
 - **Next:** Milestone 3 (catalog, hypotheses, thresholds, pre-registration): design-heavy, so the plan comes first
 - **Waiting on the owner:** see `docs/session-handoff.md`
 
