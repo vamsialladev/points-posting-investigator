@@ -1,8 +1,8 @@
 # Session handoff
 
-**Updated:** 2026-11-27. M2 PR-B2b is built and committed on the local branch `m2/parking-retry`: not pushed, and
-no PR yet. It's waiting for a quiet machine. The owner's rule: no PR or merge until every repeat test passes 10/10 on
-the final code, with CPU load checked low for 5 minutes first. PR-C remains.
+**Updated:** 2026-11-27. M2 PR-B2b passed its 10× batch on a quiet machine (140/140, verification log M2 PR-B2b #28)
+and is pushed as a PR, auto-merging when CI is green. PR-C is being built on `m2/pr-c` (worktree
+`..\points-posting-investigator-prc`); its real-stack tests wait until the owner says the machine is free.
 
 ## Resume here (B2b)
 1. `git switch m2/parking-retry`; `scripts\stack.ps1 up` (9 services, incl. `retry-worker` and Kafka's test-only
