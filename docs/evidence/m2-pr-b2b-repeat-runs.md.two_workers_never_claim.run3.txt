@@ -1,0 +1,41 @@
+F
+================================== FAILURES ===================================
+___ test_two_workers_never_claim_the_same_parked_event_and_each_posts_once ____
+
+db = {'posting': Engine(postgresql+psycopg://test_posting_app:***@127.0.0.1:5432/test_posting?connect_timeout=10), 'relay':..._timeout=10), 'ledger': Engine(postgresql+psycopg://test_ledger_app:***@127.0.0.1:5432/test_ledger?connect_timeout=10)}
+ledger = ('http://127.0.0.1:50139', 'Aag2IxMW2DEGirSkwI0g4IBj')
+kafka = '127.0.0.1:9092'
+registry = <confluent_kafka.schema_registry._sync.schema_registry_client.SchemaRegistryClient object at 0x000001F95896B920>
+scratch = {'input': 'test.in.759f911be3', 'output': 'test.out.759f911be3', 'dlq': 'test.dlq.759f911be3'}
+
+    def test_two_workers_never_claim_the_same_parked_event_and_each_posts_once(db, ledger, kafka, registry, scratch):
+        members = [f"GR-{m:05d}" for m in range(1, 13)]
+        records = {m: [stay(m, i * 100 + n) for n in range(1, 6)] for i, m in enumerate(members, start=1)}  # 60 events
+        producer = checkout_producer(kafka, registry, scratch["input"])
+        for n in range(5):
+            for m in members:
+                producer.send(records[m][n], flush=False)
+        producer.flush()
+        first_fails = {records[m][0]["stay_id"]: 1 for m in members}  # each member's first event parks; the rest follow
+        loop = consumer_for(db, ledger, kafka, registry, scratch, wrap=lambda c: FlakyLedger(c, first_fails))
+>       assert run_until(loop, 60, timeout=120).count(Outcome.PARKED) == 60
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_parking_kafka.py:193: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+loop = <app.pipeline.posting.PostingConsumer object at 0x000001F958E48500>
+wanted = 60, timeout = 120
+
+    def run_until(loop: PostingConsumer, wanted: int, timeout: float = 60.0) -> list[Outcome]:
+        """Poll until `wanted` messages were handled (POSTED, DUPLICATE or DEAD_LETTERED). RETRY isn't counted."""
+        outcomes: list[Outcome] = []
+        deadline = time.monotonic() + timeout
+        while len([o for o in outcomes if o is not Outcome.RETRY]) < wanted:
+            if time.monotonic() > deadline:
+>               raise AssertionError(f"only {outcomes} within {timeout} s")
+E               AssertionError: only [<Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.PARKED: 'parked'>, <Outcome.POSTED: 'posted'>, <Outcome.POSTED: 'posted'>, <Outcome.POSTED: 'posted'>, <Outcome.POSTED: 'posted'>, <Outcome.POSTED: 'posted'>, <Outcome.POSTED: 'posted'>] within 120 s
+
+tests\posting_helpers.py:178: AssertionError
+1 failed, 351 deselected in 240.63s (0:04:00)
+stack settings: 6/6 set
