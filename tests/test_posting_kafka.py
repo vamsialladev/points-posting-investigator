@@ -61,7 +61,7 @@ def test_one_event_gives_one_posting_one_outbox_row_and_one_published_message(db
 
 
 class SlowLedger:
-    """The real ledger client, 50 ms slower per credit, so a rebalance happens while work is still left."""
+    """The real ledger client, 50 ms slower per credit, so work is still left while the group settles."""
 
     def __init__(self, client):
         self.client = client
@@ -74,7 +74,12 @@ class SlowLedger:
 def test_a_second_consumer_joining_mid_stream_loses_nothing_and_credits_nothing_twice(
     db, ledger, kafka, registry, scratch
 ):
-    """RFC-0001 test 13 (TEST-02): a rebalance redelivers what wasn't committed; each stay is still credited once."""
+    """RFC-0001 test 13 (TEST-02): a rebalance redelivers what wasn't committed; each stay is still credited once.
+
+    The first consumer pauses its partitions after 5 events (it keeps polling, so it stays in the group) and resumes
+    once the rebalance has given it fewer partitions. Without the pause, the first consumer sometimes finished all 60
+    before the rebalance completed, and the "second consumer got a partition" check failed 4 of 10 runs
+    (`docs/evidence/m2-pr-c-repeat-runs.md`): the test hadn't tested a rebalance at all."""
     records = [stay(f"GR-{m:05d}", m * 10 + n) for m in range(1, 21) for n in (1, 2, 3)]  # 60 stays, 20 members
     producer = checkout_producer(kafka, registry, scratch["input"])
     for rec in records:
@@ -91,18 +96,27 @@ def test_a_second_consumer_joining_mid_stream_loses_nothing_and_credits_nothing_
         for _ in range(2)
     ]
     handled: list[list[Outcome]] = [[], []]
-    stop = threading.Event()
+    stop, paused, resumed = threading.Event(), threading.Event(), threading.Event()
 
     def consume(i: int) -> None:
+        consumer = loops[i].consumer
         while not stop.is_set():
-            outcome = loops[i].run_once(timeout=0.5)
+            outcome = loops[i].run_once(timeout=0.5)  # polling while paused keeps it in the group
             if outcome is not None:
                 handled[i].append(outcome)
+            if i == 0 and not paused.is_set() and len(handled[0]) >= 5:
+                consumer.pause(consumer.assignment())
+                paused.set()
+            if i == 0 and paused.is_set() and not resumed.is_set():
+                now = consumer.assignment()
+                if now and len(now) < 3:  # the rebalance gave part of the topic to the second consumer
+                    consumer.resume(now)
+                    resumed.set()
 
     first = threading.Thread(target=consume, args=(0,))
     first.start()
     deadline = time.monotonic() + 60
-    while len(handled[0]) < 10 and time.monotonic() < deadline:
+    while not paused.is_set() and time.monotonic() < deadline:
         time.sleep(0.05)
     second = threading.Thread(target=consume, args=(1,))  # joins the group: a rebalance, mid-stream
     second.start()
@@ -114,6 +128,7 @@ def test_a_second_consumer_joining_mid_stream_loses_nothing_and_credits_nothing_
     for loop in loops:
         loop.consumer.close()
 
+    assert resumed.is_set(), "the first consumer was never given fewer partitions: no rebalance happened"
     assert counts(db["posting"]) == (60, 60)
     with db["ledger"].connect() as conn:
         assert credit_problems(conn, expected_credits(*records)) == []
