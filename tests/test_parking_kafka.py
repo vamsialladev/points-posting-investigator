@@ -25,6 +25,7 @@ from tests.posting_helpers import (
     checkout_producer,
     counts,
     drain_parked,
+    first_claim,
     make_loop,
     make_service,
     make_worker,
@@ -156,7 +157,7 @@ def test_a_worker_crash_after_the_credit_is_finished_by_another_worker_with_one_
 
     crashed = make_worker(db, ledger, kafka, registry, scratch, worker_id="w-crashed", fault=crash, lease_seconds=1.0)
     with pytest.raises(RetryCrash):
-        crashed.run_once()
+        first_claim(crashed)  # wait until the parked event is due: one cycle straight away can claim nothing
     survivor = make_worker(db, ledger, kafka, registry, scratch, worker_id="w-survivor", lease_seconds=1.0)
     drain_parked(survivor, db, timeout=30)
     [row] = parked_rows(db["posting"])
@@ -179,7 +180,7 @@ def test_a_db_failure_inside_the_worker_transaction_writes_nothing_and_is_retrie
             raise DatabaseFailure("simulated failure inside the worker's posting transaction")
 
     worker = make_worker(db, ledger, kafka, registry, scratch, fault=fail_once, lease_seconds=0.5)
-    worker.run_once()
+    assert first_claim(worker).claimed == 1  # wait until the parked event is due, then the one cycle that fails
     assert failed["n"] == 1 and counts(db["posting"]) == (0, 0)  # rolled back: no posting, no outbox row
     assert parked_rows(db["posting"])[0]["status"] != "done"
     drain_parked(worker, db, timeout=30)

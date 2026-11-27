@@ -17,6 +17,7 @@ from app.pipeline.retry import (
     ParkedStats,
     RetryConfig,
     RetryCrash,
+    RetryCycle,
     RetryWorker,
     parked_failure_outcome,
 )
@@ -268,3 +269,39 @@ def test_metrics_render_the_parked_stats():
     w.run_once()
     text = w.metrics.render().decode()
     assert "posting_parked_open 0.0" in text and "posting_parked_oldest_age_seconds 0.0" in text
+
+
+# --- the real-stack tests' helper: wait for the first claim (found in CI, 2026-11-27) ---
+
+
+class _Cycles:
+    """A worker whose first cycles claim nothing (the parked event isn't due yet), as on a fast machine."""
+
+    def __init__(self, empty_cycles: int, fault: Exception | None = None) -> None:
+        self.empty_cycles, self.fault, self.calls = empty_cycles, fault, 0
+
+    def run_once(self) -> RetryCycle:
+        self.calls += 1
+        if self.calls <= self.empty_cycles:
+            return RetryCycle()
+        if self.fault:
+            raise self.fault
+        return RetryCycle(claimed=1, posted=1)
+
+
+def test_first_claim_waits_past_cycles_that_claim_nothing():
+    from tests.posting_helpers import first_claim
+
+    early = _Cycles(empty_cycles=3)
+    assert first_claim(early).claimed == 1 and early.calls == 4  # type: ignore[arg-type]
+    crashing = _Cycles(empty_cycles=3, fault=RetryCrash("after_ledger_credit"))
+    with pytest.raises(RetryCrash):
+        first_claim(crashing)  # type: ignore[arg-type]
+    assert crashing.calls == 4, "the fault point is reached only once a row is claimed"
+
+
+def test_first_claim_fails_when_nothing_is_ever_claimed():
+    from tests.posting_helpers import first_claim
+
+    with pytest.raises(AssertionError, match="claimed no parked event"):
+        first_claim(_Cycles(empty_cycles=10**9), timeout=0.05)  # type: ignore[arg-type]
