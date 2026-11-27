@@ -44,7 +44,16 @@ RUNTIME_ROLES: dict[str, tuple[RuntimeRole, ...]] = {
         RuntimeRole(
             "app",
             "POSTING_DB_PASSWORD",
-            {"TABLE posting": "SELECT, INSERT", "TABLE outbox": "SELECT, INSERT", "SEQUENCE outbox_id_seq": "USAGE"},
+            {
+                "TABLE posting": "SELECT, INSERT",
+                "TABLE outbox": "SELECT, INSERT",
+                "SEQUENCE outbox_id_seq": "USAGE",
+                # ADR-0016: the posting service parks events and the retry worker moves them on. Neither can
+                # delete a parked event or rewrite its original bytes.
+                "TABLE parked_event": "SELECT, INSERT, UPDATE (status, attempts, transient_failures, next_attempt_at,"
+                " claimed_by, lease_until, error_class, last_error, first_failed_at, last_failed_at, done_at, dead_at)",
+                "SEQUENCE parked_event_id_seq": "USAGE",
+            },
         ),
         RuntimeRole(
             "relay",

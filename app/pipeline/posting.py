@@ -4,18 +4,23 @@
 
 For each message:
 1. Decode (Avro, via the registry) and validate. Anything that can never post is dead-lettered at once: undecodable,
-   unknown schema version, a bad field, a correction (until PR-C), or a ledger 409 or other 4xx (until B2b counts
-   attempts). The original bytes go to the DLQ topic with the failure headers of RFC-0001 D8.
-2. Skip it if this event, or this stay revision, is already posted.
-3. Credit the ledger with the business key `stay_id:revision`. The ledger is a separate system of record. Its
+   unknown schema version, a bad field, a correction (until PR-C), or a ledger 409 (the stay revision was credited
+   with different points). The original bytes go to the DLQ topic with the failure headers of RFC-0001 D8.
+2. Skip it if this event, or this stay revision, is already posted, or this event is already parked (a redelivery).
+3. If the member has parked events, **park this one behind them** (ADR-0016). Per-member order holds without
+   blocking the partition.
+4. Credit the ledger with the business key `stay_id:revision`. The ledger is a separate system of record. Its
    UNIQUE(idempotency_key) gives every retry the same entry back, so it is outside the transaction on purpose.
-4. **One Postgres transaction** inserts the posting row (`ON CONFLICT DO NOTHING`) and, only if that row is new, the
-   outbox row for `points.posted`, carrying the trace context. Both commit, or neither does.
-5. Commit the Kafka offset, **only after** step 4 committed (synchronous commit of exactly this message).
+   - A transient failure (5xx, timeout, 429, 401) parks the event; it never counts toward dead-lettering.
+   - Another 4xx parks it with `attempts = 1`. The retry worker dead-letters it at the maximum.
+5. **One Postgres transaction** inserts the posting row (`ON CONFLICT DO NOTHING`) and, only if that row is new, the
+   outbox row for `points.posted`, carrying the trace context. Both commit, or neither does. When the retry worker
+   posts a parked event, marking it `done` is part of the same transaction.
+6. Commit the Kafka offset, **only after** step 5 (or the park) committed: a synchronous commit of exactly this message.
 
-If the database fails, the dead-letter topic can't be reached, or (in B2a) the ledger fails transiently, the offset
-isn't committed. The consumer seeks back to the same message and retries after a growing, jittered wait, so that
-partition waits. B2b parks transient ledger failures instead.
+If the database fails, or the dead-letter topic can't be reached, the offset isn't committed. Parking needs the
+database too. The consumer seeks back to the same message and retries after a growing, jittered wait, so that
+partition waits.
 """
 
 from __future__ import annotations
@@ -34,16 +39,16 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, Protocol
 
-from confluent_kafka import Consumer, KafkaError, TopicPartition
+from confluent_kafka import Consumer, KafkaError, KafkaException, TopicPartition
 from prometheus_client import CollectorRegistry, Counter, Histogram, generate_latest
-from sqlalchemy import Engine, exists, select
+from sqlalchemy import Engine, exists, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.pipeline import topics, trace
 from app.pipeline.events import InvalidEvent, StayEvent, ledger_key, points_for, validate
 from app.pipeline.ledger_client import LedgerClient, LedgerPermanent, LedgerTransient
-from app.pipeline.tables import outbox, posting
+from app.pipeline.tables import PARKED_OPEN, outbox, parked_event, posting
 
 log = logging.getLogger("posting")
 
@@ -52,6 +57,7 @@ class Outcome(StrEnum):
     POSTED = "posted"
     DUPLICATE = "duplicate"
     DEAD_LETTERED = "dead_lettered"
+    PARKED = "parked"
     RETRY = "retry"
 
 
@@ -65,6 +71,17 @@ class DeadLetterFailure(Exception):
 
 class PostingCrash(Exception):
     """Raised by a test's fault hook to stop the service at an exact point, as a crash would."""
+
+
+class LeaseLost(Exception):
+    """A retry worker's claim on a parked event ran out and someone else holds it: its transaction is rolled back."""
+
+
+@dataclass(frozen=True)
+class ParkReason:
+    kind: str  # behind (waiting for the member's earlier event) | transient | permanent
+    error_class: str | None = None
+    detail: str | None = None
 
 
 @dataclass(frozen=True)
@@ -88,8 +105,10 @@ class IncomingMessage:
 class PostingConfig:
     output_topic: str = topics.POINTS_POSTED
     dlq_topic: str = topics.DLQ
-    retry_base: float = 0.5
+    retry_base: float = 0.5  # seek-back retries (database or DLQ topic down)
     retry_cap: float = 10.0
+    park_base: float = 1.0  # first retry of a parked event after a failure
+    park_cap: float = 60.0
 
 
 # ---------- dead letters ----------
@@ -101,7 +120,14 @@ class DeadLetterPublisher:
     def __init__(self, producer: Any, topic: str, timeout: float = 10.0) -> None:
         self.producer, self.topic, self.timeout = producer, topic, timeout
 
-    def publish(self, message: IncomingMessage, error_class: str, detail: str, attempts: int = 1) -> None:
+    def publish(
+        self,
+        message: IncomingMessage,
+        error_class: str,
+        detail: str,
+        attempts: int = 1,
+        first_failed_at: str | None = None,
+    ) -> None:
         now = datetime.now(UTC).isoformat()
         headers = {
             **message.headers,
@@ -111,7 +137,7 @@ class DeadLetterPublisher:
             "original_topic": message.topic,
             "original_partition": str(message.partition),
             "original_offset": str(message.offset),
-            "first_failed_at": now,
+            "first_failed_at": first_failed_at or now,
             "last_failed_at": now,
         }
         result: dict[str, KafkaError | None] = {}
@@ -138,6 +164,13 @@ class PostingMetrics:
             "posting_dlq_messages", "Messages sent to the dead-letter topic", ["error_class"], registry=self.registry
         )
         self.retries = Counter("posting_retries", "Messages retried in place", ["reason"], registry=self.registry)
+        self.parked = Counter("posting_parked", "Events parked, by reason", ["reason"], registry=self.registry)
+        self.commit_failures = Counter(
+            "posting_offset_commit_failures",
+            "Offset commits that failed after the work committed",
+            ["error"],
+            registry=self.registry,
+        )
         self.ledger_seconds = Histogram(
             "posting_ledger_request_seconds", "Ledger credit latency", registry=self.registry
         )
@@ -152,12 +185,19 @@ class PostingMetrics:
 class Store(Protocol):
     def already_posted(self, event: StayEvent) -> bool: ...
 
+    def already_parked(self, event_id: str) -> bool: ...
+
+    def member_has_parked(self, member_number: str) -> bool: ...
+
+    def park(self, message: IncomingMessage, event: StayEvent, reason: ParkReason, delay: float) -> bool: ...
+
     def write(
         self,
         event: StayEvent,
         entry_id: str,
         trace_context: Mapping[str, str],
         fault: Callable[[str], None] | None = None,
+        parked: tuple[str, int] | None = None,
     ) -> bool: ...
 
 
@@ -190,9 +230,52 @@ class PostingStore:
         same = (posting.c.event_id == event.event_id) | (
             (posting.c.stay_id == event.stay_id) & (posting.c.revision == event.revision)
         )
+        return self._exists(same)
+
+    def already_parked(self, event_id: str) -> bool:
+        return self._exists(parked_event.c.event_id == event_id)
+
+    def member_has_parked(self, member_number: str) -> bool:
+        return self._exists((parked_event.c.member_number == member_number) & parked_event.c.status.in_(PARKED_OPEN))
+
+    def _exists(self, condition: Any) -> bool:
         try:
             with self.engine.connect() as conn:
-                return bool(conn.execute(select(exists().where(same))).scalar())
+                return bool(conn.execute(select(exists().where(condition))).scalar())
+        except SQLAlchemyError as exc:
+            raise DatabaseFailure(type(exc).__name__) from exc
+
+    def park(self, message: IncomingMessage, event: StayEvent, reason: ParkReason, delay: float) -> bool:
+        """Park the event (its original bytes too), due after `delay` seconds. False if it was already parked."""
+        failed = reason.kind != "behind"
+        now = func.now()
+        try:
+            with self.engine.begin() as conn:
+                row = conn.execute(
+                    insert(parked_event)
+                    .values(
+                        event_id=event.event_id,
+                        member_number=event.member_number,
+                        stay_id=event.stay_id,
+                        revision=event.revision,
+                        raw_key=message.key,
+                        raw_value=message.value,
+                        raw_headers=dict(message.headers),
+                        source_topic=message.topic,
+                        source_partition=message.partition,
+                        source_offset=message.offset,
+                        attempts=1 if reason.kind == "permanent" else 0,
+                        transient_failures=1 if reason.kind == "transient" else 0,
+                        next_attempt_at=now + func.make_interval(0, 0, 0, 0, 0, 0, delay),
+                        error_class=reason.error_class,
+                        last_error=(reason.detail or "")[:300] or None,
+                        first_failed_at=now if failed else None,
+                        last_failed_at=now if failed else None,
+                    )
+                    .on_conflict_do_nothing(index_elements=["event_id"])
+                    .returning(parked_event.c.id)
+                ).first()
+            return row is not None
         except SQLAlchemyError as exc:
             raise DatabaseFailure(type(exc).__name__) from exc
 
@@ -202,8 +285,11 @@ class PostingStore:
         entry_id: str,
         trace_context: Mapping[str, str],
         fault: Callable[[str], None] | None = None,
+        parked: tuple[str, int] | None = None,
     ) -> bool:
-        """The one transaction: the posting row and, only if it is new, its outbox row. Returns whether it was new."""
+        """The one transaction: the posting row; only if it is new, its outbox row; and with `parked`
+        (worker ID, parked event ID), that parked event marked done. Returns whether the posting was new.
+        A worker whose claim was taken over raises LeaseLost, and nothing is written."""
         points = points_for(event)
         try:
             with self.engine.begin() as conn:
@@ -224,6 +310,19 @@ class PostingStore:
                 ).first()
                 if fault is not None:
                     fault("mid_transaction")
+                if parked is not None:
+                    worker_id, parked_id = parked
+                    marked = conn.execute(
+                        update(parked_event)
+                        .where(
+                            (parked_event.c.id == parked_id)
+                            & (parked_event.c.status == "in_flight")
+                            & (parked_event.c.claimed_by == worker_id)
+                        )
+                        .values(status="done", done_at=func.now(), lease_until=None)
+                    ).rowcount
+                    if marked != 1:
+                        raise LeaseLost(f"parked event {parked_id} is no longer claimed by {worker_id}")
                 if new is None:
                     return False
                 conn.execute(
@@ -278,20 +377,38 @@ class PostingService:
         except InvalidEvent as invalid:
             return self._dead_letter(message, invalid.code, invalid.detail)
 
-        if self.store.already_posted(event):
+        if self.store.already_posted(event) or self.store.already_parked(event.event_id):
             return Outcome.DUPLICATE
+        if self.store.member_has_parked(event.member_number):
+            return self._park(message, event, ParkReason("behind"), delay=0.0)
         try:
             with self.metrics.ledger_seconds.time():
                 credit = self.ledger.credit(
                     ledger_key(event), event.member_number, event.stay_id, points_for(event), event.correlation_id
                 )
+        except LedgerTransient as unavailable:
+            reason = ParkReason("transient", f"ledger_{unavailable.reason}", str(unavailable))
+            return self._park(message, event, reason, self._first_delay(unavailable.retry_after))
         except LedgerPermanent as refused:
-            return self._dead_letter(message, f"ledger_{refused.reason}", str(refused))
+            if refused.reason == "idempotency_conflict":  # retrying can't fix a key used with other points
+                return self._dead_letter(message, f"ledger_{refused.reason}", str(refused))
+            reason = ParkReason("permanent", f"ledger_{refused.reason}", str(refused))
+            return self._park(message, event, reason, self._first_delay(None))
         self._fault("after_ledger_credit")
         incoming = trace.context_from_headers(message.headers)
         context = {**incoming, "traceparent": trace.child(incoming.get("traceparent"))}  # this service's span
         inserted = self.store.write(event, credit.entry_id, context, fault=self.fault)
         return Outcome.POSTED if inserted else Outcome.DUPLICATE
+
+    def _first_delay(self, retry_after: float | None) -> float:
+        step = self.config.park_base
+        return max(retry_after or 0.0, step / 2 + random.random() * step / 2)  # noqa: S311 (jitter, not security)
+
+    def _park(self, message: IncomingMessage, event: StayEvent, reason: ParkReason, delay: float) -> Outcome:
+        if not self.store.park(message, event, reason, delay):
+            return Outcome.DUPLICATE  # parked by an earlier delivery of this same event
+        self.metrics.parked.labels(reason=reason.kind).inc()
+        return Outcome.PARKED
 
     def _dead_letter(self, message: IncomingMessage, error_class: str, detail: str) -> Outcome:
         self.dead_letters.publish(message, error_class, detail)
@@ -359,7 +476,20 @@ class PostingConsumer:
                 metrics.retries.labels(reason=type(failure).__name__).inc()
             return Outcome.RETRY
         self._fault("after_db_commit_before_offset_commit")
-        self.consumer.commit(message=message, asynchronous=False)
+        try:
+            self.consumer.commit(message=message, asynchronous=False)
+        except KafkaException as exc:
+            # The work is done (its transaction committed), so this is not a retry. Offsets are cumulative per
+            # partition: the next successful commit covers this one. If none comes (a crash or a rebalance), the
+            # message is redelivered and recognised as a duplicate. Seen in M2 PR-B2b: "Waiting for coordinator".
+            error = exc.args[0] if exc.args and isinstance(exc.args[0], KafkaError) else None
+            name = error.name() if error is not None else type(exc).__name__
+            log.warning(
+                "offset commit failed for %s/%s@%s: %s", incoming.topic, incoming.partition, incoming.offset, name
+            )
+            metrics = getattr(self.service, "metrics", None)
+            if metrics is not None:
+                metrics.commit_failures.labels(error=name).inc()
         self.consecutive_failures = 0
         return outcome
 

@@ -21,7 +21,7 @@ from app.ledger.api import create_app
 from app.ledger.core import LedgerSettings
 from app.ledger.store import PostgresCreditStore
 from app.pipeline import schemas, topics
-from app.pipeline.ledger_client import LedgerClient
+from app.pipeline.ledger_client import LedgerClient, LedgerTransient
 from app.pipeline.posting import (
     DeadLetterPublisher,
     Outcome,
@@ -31,7 +31,8 @@ from app.pipeline.posting import (
     PostingStore,
     make_consumer,
 )
-from app.pipeline.producer import CheckoutProducer
+from app.pipeline.producer import CheckoutProducer, make_checkout_producer
+from app.pipeline.retry import ParkedStore, RetryConfig, RetryWorker
 
 
 @contextmanager
@@ -57,8 +58,8 @@ def ledger_server(engine: Engine, token: str) -> Iterator[str]:
 
 
 def checkout_producer(kafka: str, registry: SchemaRegistryClient, topic: str) -> CheckoutProducer:
-    producer = Producer({"bootstrap.servers": kafka, "enable.idempotence": True, "acks": "all"})
-    return CheckoutProducer(producer, registry, topic, schema=schemas.latest(topics.CHECKED_OUT))
+    # The real delivery settings (ADR-0017): a test whose events weren't all delivered fails at the send, loudly.
+    return CheckoutProducer(make_checkout_producer(kafka), registry, topic, schema=schemas.latest(topics.CHECKED_OUT))
 
 
 def raw_producer(kafka: str) -> Producer:
@@ -74,7 +75,20 @@ def make_service(
     output_topic: str,
     dlq_topic: str,
     fault: Callable[[str], None] | None = None,
+    wrap: Callable[[Any], Any] | None = None,
 ) -> PostingService:
+    ledger: Any = LedgerClient(ledger_url, token, timeout=5.0)
+    return PostingService(
+        PostingStore(engine, output_topic),
+        wrap(ledger) if wrap else ledger,
+        avro_deserialize(registry),
+        DeadLetterPublisher(Producer({"bootstrap.servers": kafka, "acks": "all"}), dlq_topic),
+        PostingConfig(output_topic=output_topic, dlq_topic=dlq_topic, park_base=0.02, park_cap=0.1),
+        fault=fault,
+    )
+
+
+def avro_deserialize(registry: SchemaRegistryClient) -> Callable[[bytes, str], dict[str, Any]]:
     deserializer = AvroDeserializer(registry)
 
     def deserialize(value: bytes, topic: str) -> dict[str, Any]:
@@ -83,14 +97,72 @@ def make_service(
             raise ValueError("not a record")
         return record
 
-    return PostingService(
-        PostingStore(engine, output_topic),
-        LedgerClient(ledger_url, token, timeout=5.0),
-        deserialize,
-        DeadLetterPublisher(Producer({"bootstrap.servers": kafka, "acks": "all"}), dlq_topic),
-        PostingConfig(output_topic=output_topic, dlq_topic=dlq_topic),
+    return deserialize
+
+
+class FlakyLedger:
+    """The real ledger client, except that chosen stays fail transiently a set number of times first."""
+
+    def __init__(self, real: Any, failures: dict[str, int]) -> None:
+        self.real, self.left, self.lock = real, dict(failures), threading.Lock()
+
+    def credit(self, key: str, member_number: str, stay_id: str, points: int, correlation_id: str) -> Any:
+        with self.lock:
+            if self.left.get(stay_id, 0) > 0:
+                self.left[stay_id] -= 1
+                raise LedgerTransient("unavailable_503")
+        return self.real.credit(key, member_number, stay_id, points, correlation_id)
+
+
+def make_worker(
+    db: dict[str, Engine],
+    ledger: tuple[str, str],
+    kafka: str,
+    registry: SchemaRegistryClient,
+    scratch: dict[str, str],
+    *,
+    worker_id: str = "w1",
+    fault: Callable[[str], None] | None = None,
+    wrap: Callable[[Any], Any] | None = None,
+    **config: Any,
+) -> RetryWorker:
+    url, token = ledger
+    client: Any = LedgerClient(url, token, timeout=5.0)
+    settings = {"backoff_base": 0.02, "backoff_cap": 0.1, **config}
+    return RetryWorker(
+        ParkedStore(db["posting"]),
+        PostingStore(db["posting"], scratch["output"]),
+        wrap(client) if wrap else client,
+        avro_deserialize(registry),
+        DeadLetterPublisher(Producer({"bootstrap.servers": kafka, "acks": "all"}), scratch["dlq"]),
+        RetryConfig(worker_id=worker_id, **settings),
         fault=fault,
     )
+
+
+def open_parked(engine: Engine) -> int:
+    with engine.connect() as conn:
+        return int(
+            conn.execute(
+                text("SELECT count(*) FROM parked_event WHERE status IN ('pending', 'in_flight')")
+            ).scalar_one()
+        )
+
+
+def drain_parked(workers: Any, db: dict[str, Engine], timeout: float = 60.0) -> None:
+    workers = workers if isinstance(workers, list) else [workers]
+    deadline = time.monotonic() + timeout
+    while open_parked(db["posting"]):
+        if time.monotonic() > deadline:
+            raise AssertionError(f"parked events still open after {timeout} s")
+        for worker in workers:
+            worker.run_once()
+        time.sleep(0.02)
+
+
+def parked_rows(engine: Engine) -> list[dict[str, Any]]:
+    with engine.connect() as conn:
+        return [dict(r._mapping) for r in conn.execute(text("SELECT * FROM parked_event ORDER BY id"))]
 
 
 def make_loop(service: PostingService, kafka: str, group: str, input_topic: str) -> PostingConsumer:

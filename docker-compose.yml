@@ -51,11 +51,13 @@ services:
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENERS: INTERNAL://:29092,CONTROLLER://:29093,EXTERNAL://:9092
+      KAFKA_LISTENERS: INTERNAL://:29092,CONTROLLER://:29093,EXTERNAL://:9092,FAULTS://:19093
       # 127.0.0.1, not localhost: on Windows a client given "localhost" tries ::1 first and waits 2 s for it to fail
       # (measured in M2 PR-B1; same cause as ADR-0012). The stack binds IPv4 only.
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://127.0.0.1:${KAFKA_HOST_PORT:-9092}
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://127.0.0.1:${KAFKA_HOST_PORT:-9092},FAULTS://127.0.0.1:19092
+      # FAULTS (tests only): advertised as 127.0.0.1:19092, where tests/kafka_proxy.py listens and forwards to this
+      # listener (host port 19093), dropping replies on demand to force producer retries (ADR-0017).
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,FAULTS:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"  # topics come from app/pipeline/topics.py only
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -65,6 +67,7 @@ services:
       KAFKA_HEAP_OPTS: "-Xms512m -Xmx512m"  # RFC-0001 D1: fits Docker Desktop
     ports:
       - "127.0.0.1:${KAFKA_HOST_PORT:-9092}:9092"
+      - "127.0.0.1:19093:19093"  # the FAULTS listener, reached through the test proxy on 19092
     healthcheck:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:29092 > /dev/null 2>&1"]
       interval: 5s
@@ -179,6 +182,38 @@ services:
       timeout: 5s
       retries: 30
     stop_grace_period: 20s  # SIGTERM: finish the message, commit its offset, close
+    restart: unless-stopped
+
+  retry-worker:
+    <<: *app
+    command: [python, -m, app.pipeline.retry]
+    environment:
+      POSTING_DB_PASSWORD: ${POSTING_DB_PASSWORD:?set POSTING_DB_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
+      POSTGRES_HOST: db
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      LEDGER_API_URL: http://ledger:8020
+      LEDGER_API_TOKEN: ${LEDGER_API_TOKEN:?set LEDGER_API_TOKEN in .env}
+      RETRY_WORKER_ID: retry-1
+      RETRY_METRICS_HOST: 0.0.0.0
+      RETRY_METRICS_PORT: 9110
+    ports:
+      - "127.0.0.1:${RETRY_METRICS_HOST_PORT:-9110}:9110"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+      schema-registry:
+        condition: service_healthy
+      ledger:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9110/metrics', timeout=3)"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+    stop_grace_period: 20s  # SIGTERM: finish the cycle, then exit
     restart: unless-stopped
 
   relay:

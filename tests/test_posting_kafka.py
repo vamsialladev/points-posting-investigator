@@ -4,90 +4,32 @@ app over HTTP (ADR-0015). Crash and concurrency tests are run 10 times by script
 
 from __future__ import annotations
 
-import secrets
 import threading
 import uuid
-from collections.abc import Iterator
-from datetime import date
 
 import pytest
 from confluent_kafka import TopicPartition
-from confluent_kafka.admin import AdminClient
-from sqlalchemy import Engine, create_engine, select, text
+from sqlalchemy import select, text
 
-from app.pipeline import topics, trace
-from app.pipeline.events import ledger_key, points_for, validate
+from app.pipeline import trace
 from app.pipeline.posting import DatabaseFailure, IncomingMessage, Outcome, PostingCrash, make_consumer
-from app.pipeline.producer import build_event
 from app.pipeline.tables import outbox
-from tests.infra import LEDGER, POSTING, admin_connect, role_url
 from tests.ledger_checks import credit_problems
+from tests.pipeline_fixtures import expected_credits, stay
 from tests.posting_helpers import (
     checkout_producer,
     counts,
-    ledger_server,
+    drain_parked,
     make_loop,
     make_service,
+    make_worker,
     raw_producer,
     read_raw,
     run_until,
 )
 from tests.relay_helpers import drain, make_relay, open_rows, read_topic
-from tests.test_kafka_stack import drop_subject
 
 pytestmark = [pytest.mark.postgres, pytest.mark.kafka]
-
-
-@pytest.fixture
-def db(admin, passwords, host) -> Iterator[dict[str, Engine]]:
-    with admin_connect(admin, POSTING) as conn:
-        conn.execute("TRUNCATE posting, outbox RESTART IDENTITY")
-    with admin_connect(admin, LEDGER) as conn:
-        conn.execute("TRUNCATE credits")
-    engines = {
-        "posting": create_engine(role_url(POSTING, passwords, host, "app"), pool_size=10),
-        "relay": create_engine(role_url(POSTING, passwords, host, "relay")),
-        "ledger": create_engine(role_url(LEDGER, passwords, host), pool_size=10),
-    }
-    yield engines
-    for engine in engines.values():
-        engine.dispose()
-
-
-@pytest.fixture
-def ledger(db) -> Iterator[tuple[str, str]]:
-    token = secrets.token_urlsafe(18)
-    with ledger_server(db["ledger"], token) as url:
-        yield url, token
-
-
-@pytest.fixture
-def scratch(kafka, registry) -> Iterator[dict[str, str]]:
-    tag = uuid.uuid4().hex[:10]
-    names = {"input": f"test.in.{tag}", "output": f"test.out.{tag}", "dlq": f"test.dlq.{tag}"}
-    topics.ensure_topics(kafka, tuple(topics.TopicSpec(name) for name in names.values()))
-    yield names
-    AdminClient({"bootstrap.servers": kafka}).delete_topics(list(names.values()), operation_timeout=30)
-    for name in names.values():
-        drop_subject(registry, f"{name}-value")
-
-
-def stay(member: str, n: int, **changes) -> dict:
-    prefix, prop = ("BR", "beach-resort") if n % 2 else ("ML", "mountain-lodge")
-    return build_event(
-        member_number=member,
-        stay_id=f"{prefix}-{n:04d}",
-        property=prop,
-        check_in=date(2026, 11, 14),
-        nights=2,
-        room_rate_cents=20_000 + n,
-        **changes,
-    )
-
-
-def expected_credits(*records: dict) -> dict[str, int]:
-    events = [validate(r, {"event_id": r["event_id"], "schema_version": "1"}) for r in records]
-    return {ledger_key(e): points_for(e) for e in events}
 
 
 def service_for(db, ledger, kafka, registry, scratch, fault=None):
@@ -289,19 +231,27 @@ def test_a_correction_is_dead_lettered_until_pr_c(db, ledger, kafka, registry, s
         assert credit_problems(conn, {}) == []  # nothing credited
 
 
-def test_a_ledger_outage_is_retried_in_place_without_committing(db, ledger, kafka, registry, scratch):
-    """B2a behaviour (B2b parks instead): the event waits, nothing is written, then it posts once."""
+def test_a_ledger_outage_parks_the_event_commits_the_offset_and_the_worker_posts_it_later(
+    db, ledger, kafka, registry, scratch
+):
+    """B2b (ADR-0016): the event is parked and its offset committed, so the partition moves on; it posts once later."""
     _, token = ledger
     rec = stay("GR-00001", 1)
     checkout_producer(kafka, registry, scratch["input"]).send(rec)
     group = "g-" + uuid.uuid4().hex[:6]
     down = make_service(db["posting"], "http://127.0.0.1:9", token, kafka, registry, scratch["output"], scratch["dlq"])
     loop = make_loop(down, kafka, group, scratch["input"])
-    assert [loop.run_once(timeout=5.0) for _ in range(3)].count(Outcome.RETRY) >= 2
+    assert run_until(loop, 1) == [Outcome.PARKED]
     assert counts(db["posting"]) == (0, 0)
     loop.consumer.close()
-    up = make_loop(service_for(db, ledger, kafka, registry, scratch), kafka, group, scratch["input"])
-    assert run_until(up, 1) == [Outcome.POSTED]
+    later = make_consumer(kafka, group, [scratch["input"]])
+    committed = later.committed([TopicPartition(scratch["input"], p) for p in range(3)], timeout=10)
+    later.close()
+    assert sum(max(tp.offset, 0) for tp in committed) == 1  # the offset moved on: nothing blocks the partition
+
+    worker = make_worker(db, ledger, kafka, registry, scratch)
+    drain_parked(worker, db)
+    assert counts(db["posting"]) == (1, 1)
     with db["ledger"].connect() as conn:
         assert credit_problems(conn, expected_credits(rec)) == []
 

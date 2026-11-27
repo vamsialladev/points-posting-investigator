@@ -1,9 +1,13 @@
-"""The pipeline's Kafka topics, created explicitly (auto-creation is off in the broker) (RFC-0001 D7, D8).
+"""The pipeline's Kafka topics, created explicitly (auto-creation is off in the broker) (RFC-0001 D7).
 
     python -m app.pipeline.topics     # uses KAFKA_BOOTSTRAP_SERVERS
 
 Three partitions each, keyed by `member_number`, so one member's events stay in order on one partition.
 Replication factor 1, because the local stack has one broker: dev-only, documented in docs/scaling-and-limits.md.
+
+There are no retry topics (ADR-0016, replacing RFC-0001 D8). A failed event is parked in Postgres behind the member's
+earlier parked events, which keeps per-member order; a retry topic would let event 2 overtake event 1. A stack created
+before B2b still has the three `.retry.N` topics, unused; recreating the Kafka container drops them.
 """
 
 from __future__ import annotations
@@ -17,17 +21,8 @@ from confluent_kafka.cimpl import NewTopic
 
 CHECKED_OUT = "stay.checked_out"
 POINTS_POSTED = "points.posted"
-RETRY_DELAYS_SECONDS = (5, 30, 120)  # D8: retry.1, retry.2, retry.3; tests inject shorter ones
-DAY_MS = 24 * 60 * 60 * 1000
-
-
-def retry_topic(attempt: int) -> str:
-    if not 1 <= attempt <= len(RETRY_DELAYS_SECONDS):
-        raise ValueError(f"retry attempt must be 1..{len(RETRY_DELAYS_SECONDS)}")
-    return f"{CHECKED_OUT}.retry.{attempt}"
-
-
 DLQ = f"{CHECKED_OUT}.dlq"
+DAY_MS = 24 * 60 * 60 * 1000
 
 
 @dataclass(frozen=True)
@@ -45,7 +40,6 @@ class TopicSpec:
 
 TOPICS: tuple[TopicSpec, ...] = (
     TopicSpec(CHECKED_OUT, config={"retention.ms": str(7 * DAY_MS)}),
-    *(TopicSpec(retry_topic(n), config={"retention.ms": str(7 * DAY_MS)}) for n in (1, 2, 3)),
     # The DLQ keeps messages longer: an operator replays from it (M7, with approval).
     TopicSpec(DLQ, config={"retention.ms": str(30 * DAY_MS)}),
     TopicSpec(POINTS_POSTED, config={"retention.ms": str(7 * DAY_MS)}),

@@ -8,7 +8,7 @@ from datetime import UTC, date, datetime
 
 import httpx
 import pytest
-from confluent_kafka import KafkaError
+from confluent_kafka import KafkaError, KafkaException
 
 from app.pipeline import trace
 from app.pipeline.events import InvalidEvent, ledger_key, points_for, validate
@@ -355,6 +355,27 @@ def test_a_crash_after_the_database_commit_leaves_the_offset_uncommitted():
     with pytest.raises(PostingCrash):
         posting.run_once()
     assert consumer.commits == []
+
+
+def test_a_failed_offset_commit_is_a_warning_and_the_loop_goes_on(caplog):
+    """The database transaction already committed, so the work is done: a commit failure (here the group coordinator
+    is unavailable, as seen in the M2 PR-B2b full run) must not crash the cycle or retry the message. Offsets are
+    cumulative per partition, so the next successful commit covers this one; if none comes (a crash or rebalance), the
+    message is redelivered and recognised as a duplicate."""
+    from app.pipeline.posting import PostingMetrics
+
+    posting, service, consumer, _ = loop(Outcome.POSTED)
+    service.metrics = PostingMetrics()
+
+    def refuse(message, asynchronous):
+        raise KafkaException(KafkaError(KafkaError._WAIT_COORD))
+
+    consumer.commit = refuse
+    assert posting.run_once() is Outcome.POSTED
+    assert consumer.seeks == []  # not retried: it was posted
+    assert posting.consecutive_failures == 0
+    assert "offset commit failed" in caplog.text
+    assert 'posting_offset_commit_failures_total{error="_WAIT_COORD"} 1.0' in service.metrics.render().decode()
 
 
 def test_nothing_to_poll():
