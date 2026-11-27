@@ -5,6 +5,7 @@ app over HTTP (ADR-0015). Crash and concurrency tests are run 10 times by script
 from __future__ import annotations
 
 import threading
+import time
 import uuid
 
 import pytest
@@ -57,6 +58,87 @@ def test_one_event_gives_one_posting_one_outbox_row_and_one_published_message(db
     assert message.value["source_event_id"] == sent.event_id == rec["event_id"]
     assert message.value["credited_points"] == 2_000
     assert trace.trace_id(message.headers["traceparent"]) == trace.trace_id(sent.traceparent)
+
+
+class SlowLedger:
+    """The real ledger client, 50 ms slower per credit, so work is still left while the group settles."""
+
+    def __init__(self, client):
+        self.client = client
+
+    def credit(self, *args):
+        time.sleep(0.05)
+        return self.client.credit(*args)
+
+
+def test_a_second_consumer_joining_mid_stream_loses_nothing_and_credits_nothing_twice(
+    db, ledger, kafka, registry, scratch
+):
+    """RFC-0001 test 13 (TEST-02): a rebalance redelivers what wasn't committed; each stay is still credited once.
+
+    The first consumer pauses its partitions after 5 events (it keeps polling, so it stays in the group) and resumes
+    once the rebalance has given it fewer partitions. Without the pause, the first consumer sometimes finished all 60
+    before the rebalance completed, and the "second consumer got a partition" check failed 4 of 10 runs
+    (`docs/evidence/m2-pr-c-repeat-runs.md`): the test hadn't tested a rebalance at all."""
+    records = [stay(f"GR-{m:05d}", m * 10 + n) for m in range(1, 21) for n in (1, 2, 3)]  # 60 stays, 20 members
+    producer = checkout_producer(kafka, registry, scratch["input"])
+    for rec in records:
+        producer.send(rec, flush=False)
+    producer.flush()
+    group = "g-" + uuid.uuid4().hex[:6]
+    loops = [
+        make_loop(
+            make_service(db["posting"], *ledger, kafka, registry, scratch["output"], scratch["dlq"], wrap=SlowLedger),
+            kafka,
+            group,
+            scratch["input"],
+        )
+        for _ in range(2)
+    ]
+    handled: list[list[Outcome]] = [[], []]
+    stop, paused, resumed = threading.Event(), threading.Event(), threading.Event()
+
+    def consume(i: int) -> None:
+        consumer = loops[i].consumer
+        while not stop.is_set():
+            outcome = loops[i].run_once(timeout=0.5)  # polling while paused keeps it in the group
+            if outcome is not None:
+                handled[i].append(outcome)
+            if i == 0 and not paused.is_set() and len(handled[0]) >= 5:
+                consumer.pause(consumer.assignment())
+                paused.set()
+            if i == 0 and paused.is_set() and not resumed.is_set():
+                now = consumer.assignment()
+                if now and len(now) < 3:  # the rebalance gave part of the topic to the second consumer
+                    consumer.resume(now)
+                    resumed.set()
+
+    first = threading.Thread(target=consume, args=(0,))
+    first.start()
+    deadline = time.monotonic() + 60
+    while not paused.is_set() and time.monotonic() < deadline:
+        time.sleep(0.05)
+    second = threading.Thread(target=consume, args=(1,))  # joins the group: a rebalance, mid-stream
+    second.start()
+    while counts(db["posting"])[0] < 60 and time.monotonic() < deadline + 60:
+        time.sleep(0.2)
+    stop.set()
+    first.join(10)
+    second.join(10)
+    for loop in loops:
+        loop.consumer.close()
+
+    assert resumed.is_set(), "the first consumer was never given fewer partitions: no rebalance happened"
+    assert counts(db["posting"]) == (60, 60)
+    with db["ledger"].connect() as conn:
+        assert credit_problems(conn, expected_credits(*records)) == []
+    assert handled[1].count(Outcome.POSTED) >= 1, "the second consumer never got a partition: no rebalance happened"
+    posted = handled[0].count(Outcome.POSTED) + handled[1].count(Outcome.POSTED)
+    assert posted == 60  # a redelivery after the rebalance is a DUPLICATE, never a second POSTED
+    print(
+        f"evidence: first consumer {len(handled[0])} handled, second {len(handled[1])}; duplicates "
+        f"{handled[0].count(Outcome.DUPLICATE) + handled[1].count(Outcome.DUPLICATE)}"
+    )
 
 
 # ---------- crashes and failures ----------
@@ -217,18 +299,58 @@ def test_an_undecodable_event_is_dead_lettered_and_the_next_event_flows(db, ledg
     assert headers["original_topic"] == scratch["input"]
 
 
-def test_a_correction_is_dead_lettered_until_pr_c(db, ledger, kafka, registry, scratch):
+def test_corrections_credit_the_difference_and_a_stale_revision_is_skipped(db, ledger, kafka, registry, scratch):
+    """D10 (catalog scenario 11), replacing B2a's "dead-lettered until PR-C". Revisions 1, 3, then 2 of one stay:
+    1 credits the stay, 3 the difference from 1, and 2 (now stale) is recorded and not credited."""
+    original = stay("GR-00001", 1, room_rate_cents=40_000)  # 4,000 points
+    third = stay("GR-00001", 1, room_rate_cents=46_000, revision=3)  # 4,600: +600
+    second = stay("GR-00001", 1, room_rate_cents=10_000, revision=2)  # arrives last: stale
+    producer = checkout_producer(kafka, registry, scratch["input"])
+    for rec in (original, third, second):
+        producer.send(rec)
+    loop = make_loop(
+        service_for(db, ledger, kafka, registry, scratch), kafka, "g-" + uuid.uuid4().hex[:6], scratch["input"]
+    )
+    assert run_until(loop, 3) == [Outcome.POSTED, Outcome.POSTED, Outcome.SKIPPED]  # one member: one partition
+
+    with db["ledger"].connect() as conn:
+        assert credit_problems(conn, {"BR-0001:1": 4_000, "BR-0001:3": 600}) == []
+        assert conn.execute(text("SELECT sum(points) FROM credits")).scalar() == 4_600  # what revision 3 earns
+    with db["posting"].connect() as conn:
+        skipped = conn.execute(text("SELECT event_id, revision, latest_revision FROM skipped_event")).all()
+    assert [tuple(r) for r in skipped] == [(second["event_id"], 2, 3)]
+    relay = make_relay("r1", kafka, registry, db["relay"], scratch["output"])
+    drain([relay], lambda: open_rows(db["relay"]) == 0)
+    received = read_topic(kafka, registry, scratch["output"], at_least=2)
+    assert sorted(m.value["credited_points"] for m in received) == [600, 4_000]
+
+
+def test_a_correction_before_its_original_is_retried_then_dead_lettered_as_original_missing(
+    db, ledger, kafka, registry, scratch
+):
+    """RFC-0001 test 12: nothing posted for the stay, so the correction is parked, retried to the maximum, and sent to
+    the DLQ with its original bytes. Nothing is credited."""
     rec = stay("GR-00001", 1, revision=2)
     checkout_producer(kafka, registry, scratch["input"]).send(rec)
     loop = make_loop(
         service_for(db, ledger, kafka, registry, scratch), kafka, "g-" + uuid.uuid4().hex[:6], scratch["input"]
     )
-    assert run_until(loop, 1) == [Outcome.DEAD_LETTERED]
+    assert run_until(loop, 1) == [Outcome.PARKED]
+    worker = make_worker(db, ledger, kafka, registry, scratch)
+    drain_parked(worker, db)
     [dead] = read_raw(kafka, scratch["dlq"], at_least=1)
-    assert dict((k, v.decode()) for k, v in dead.headers())["error_class"] == "unsupported_revision"
+    headers = dict((k, v.decode()) for k, v in dead.headers())
+    assert (headers["error_class"], headers["attempt"]) == ("original_missing", "5")
+    assert headers["event_id"] == rec["event_id"]
     assert counts(db["posting"]) == (0, 0)
     with db["ledger"].connect() as conn:
         assert credit_problems(conn, {}) == []  # nothing credited
+
+
+def test_the_posting_role_can_not_change_or_delete_a_skipped_event(db):
+    for statement in ("UPDATE skipped_event SET revision = 9", "DELETE FROM skipped_event"):
+        with db["posting"].connect() as conn, pytest.raises(Exception, match="permission denied"):
+            conn.execute(text(statement))
 
 
 def test_a_ledger_outage_parks_the_event_commits_the_offset_and_the_worker_posts_it_later(

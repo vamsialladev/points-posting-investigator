@@ -13,3 +13,12 @@ rather than pass, otherwise green would claim safety that was never verified, th
 
 **Note:** correct, and it is ADR-0007's reason. The same holds for gitleaks, which exits 0 on a repository with no
 commits (verification log, M1 #13).
+
+## Milestone 2 (2026-11-27)
+**Exercise:** in `tests/test_producer_kafka.py`, run the control `test_without_idempotence_the_same_fault_does_duplicate`
+and then `test_producer_retries_add_no_duplicates_and_keep_per_member_order` once each (stack up). Both cut the same
+number of acknowledgements. Explain why the control is what makes "0 duplicates" in the second test mean something.
+
+**Owner's result:** _waiting for the owner_
+
+**Owner's answer:** _waiting for the owner_

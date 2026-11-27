@@ -514,3 +514,42 @@ this decision. Updates are added as dated bullets; nothing is rewritten.
       control showed 37 duplicates from the same fault
 - **What would change this decision:** writing several topics atomically (then transactions), or a producer that must
   keep going after a fatal error (then recreate it automatically, with an alert).
+
+## ADR-0018: Corrections credit the difference, through the same parking path; the schema gate runs inside CI's integration job
+- **Context:** M2 PR-C builds RFC-0001 D10 (corrections), PIPE-09/10 (seeds, the load generator) and DEL-07 (the
+  schema gate). D10 was written when retries used retry topics. ADR-0016 replaced those with parking.
+- **Options considered:**
+  - **Corrections:**
+    1. A separate correction consumer.
+    2. The same posting path, with a pure rule (`events.plan_credit`) used by both the consumer and the retry worker.
+  - **Stale revisions:**
+    1. A log line only.
+    2. A `skipped_event` table: queryable, so the investigator (M6) can cite a stored row.
+  - **The schema gate:**
+    1. A sixth CI job, which also needs a change to `main`'s protection.
+    2. A step in the `integration` job, which already runs a registry.
+- **Decision:** option 2 in each case.
+  - **The credit rule:**
+    - a correction credits the signed difference from the stay's latest posted revision, under the ledger key
+      `stay_id:revision`
+    - a revision at or below the latest posted one is recorded in `skipped_event` and not credited
+    - a correction with nothing posted for its stay parks as `original_missing`, a permanent failure, so it's
+      dead-lettered after 5 attempts
+    - a redelivery gets the same plan, so the ledger replays, not credits twice
+  - **Seeds:** `seed.stays()` allocates stay IDs in sequence and derives event IDs from the seed. The old
+    `synthetic_events` drew random stay IDs, so two members could share one: the second stay was then treated as a
+    duplicate and refused with a 409. It now delegates to `seed.stays()`.
+  - **Deferred:** the ledger `members` table that RFC-0001 change 6 moved to PR-C. Nothing in M2 reads it, and the
+    ledger doesn't validate members. It goes in the milestone whose scenario needs it (M3), recorded in the backlog.
+    The owner confirmed the deferral on 2026-11-27.
+- **Tradeoff:**
+  - **A correction that arrives before its original:** the original, arriving later for the same member, parks
+    behind it. It posts only once the correction is dead-lettered, and the correction then needs a replay (M7, with
+    approval).
+  - **The local schema check is structural and conservative:** flat records, exact logical types. The registry
+    remains the authority.
+  - **Where the gate runs:** its local check is offline (unit tests, every CI run); its registry step needs a
+    registry, so it runs in CI's integration job and against the local stack.
+- **Result:** verification log, M2 PR-C.
+- **What would change this decision:** corrections often arriving before originals (then let an original overtake a
+  waiting correction of its own stay), or nested schemas (then a real compatibility library for the local check).

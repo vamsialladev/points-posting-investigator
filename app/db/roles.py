@@ -53,6 +53,7 @@ RUNTIME_ROLES: dict[str, tuple[RuntimeRole, ...]] = {
                 "TABLE parked_event": "SELECT, INSERT, UPDATE (status, attempts, transient_failures, next_attempt_at,"
                 " claimed_by, lease_until, error_class, last_error, first_failed_at, last_failed_at, done_at, dead_at)",
                 "SEQUENCE parked_event_id_seq": "USAGE",
+                "TABLE skipped_event": "SELECT, INSERT",  # D10: stale revisions, recorded once, never changed
             },
         ),
         RuntimeRole(

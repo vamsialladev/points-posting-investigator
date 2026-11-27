@@ -75,7 +75,19 @@ All notable changes to this project are documented here. The format follows
   - `scripts\repeat_tests.ps1` keeps every run's full output, one line per test, and flags runs on a busy machine
     (not counted); `scripts\quiet_check.ps1` checks that CPU load is low before a batch
 
+- Milestone 2, PR-C (ADR-0018):
+  - corrections (RFC-0001 D10): a higher revision credits the signed difference from the stay's latest posted one;
+    a stale revision is recorded in `skipped_event` (migration 0004) and not credited; a correction with no
+    original is retried as `original_missing`, then dead-lettered
+  - `app/pipeline/seed.py`: synthetic members and distinct stays in Stage 9's shapes, with seeded event IDs
+  - `app/pipeline/loadgen.py`: rate-paced synthetic load with hard caps (200/s, 10,000 a run), corrections and
+    duplicates mixed in
+  - `app/pipeline/schema_check.py`: the schema gate (local structural check plus the registry), a step in CI
+  - docs: `event-semantics.md`, `architecture.md`, `data-dictionary.md`, `scaling-and-limits.md`,
+    `tech-debt-register.md`, `real-system-swap-guide.md`
+
 ### Fixed
+- `synthetic_events` could give two members the same stay ID, so the second stay was refused as a duplicate (PR-C).
 - The checkout producer could lose an event silently: `send()` returned before Kafka answered, and `flush()` only
   checked the queue. Every send now has a delivery callback, and `flush()` raises `DeliveryFailed` for any error or
   missing report. The producer uses idempotence, `acks=all`, the gapless guarantee and a bounded delivery timeout

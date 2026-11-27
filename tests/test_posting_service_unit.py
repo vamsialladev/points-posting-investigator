@@ -12,7 +12,7 @@ from datetime import UTC, date, datetime
 import pytest
 
 from app.pipeline import trace
-from app.pipeline.events import validate
+from app.pipeline.events import LatestPosting, validate
 from app.pipeline.ledger_client import Credited, LedgerPermanent, LedgerTransient
 from app.pipeline.posting import IncomingMessage, Outcome, PostingService, outbox_payload
 from app.pipeline.producer import CheckoutProducer, DeliveryFailed, build_event, synthetic_events
@@ -26,8 +26,12 @@ class FakeStore:
     new: bool = True
     parked_already: bool = False
     member_parked: bool = False
+    latest: LatestPosting | None = None
+    skipped_new: bool = True
     writes: list = field(default_factory=list)
     parks: list = field(default_factory=list)
+    skips: list = field(default_factory=list)
+    credited: list = field(default_factory=list)
 
     def already_posted(self, event):
         return self.posted
@@ -42,8 +46,16 @@ class FakeStore:
         self.parks.append((event.event_id, reason.kind, reason.error_class))
         return True
 
-    def write(self, event, entry_id, trace_context, fault=None, parked=None):
+    def latest_posting(self, stay_id):
+        return self.latest
+
+    def record_skipped(self, event, plan):
+        self.skips.append((event.event_id, event.revision, plan.latest_revision))
+        return self.skipped_new
+
+    def write(self, event, entry_id, trace_context, fault=None, parked=None, credited=None):
         self.writes.append((event.event_id, entry_id, dict(trace_context)))
+        self.credited.append(credited)
         return self.new
 
 
@@ -117,7 +129,7 @@ def test_a_race_lost_at_the_insert_is_a_duplicate():
         ({"decode_error": ValueError("bad magic byte")}, message(), "schema"),
         ({}, message(value=None), "schema"),
         ({}, message(schema_version="9"), "schema_version"),
-        ({"record": {**RECORD, "revision": 2}}, message(), "unsupported_revision"),
+        ({"record": {**RECORD, "revision": 0}}, message(), "invalid_field"),
         ({"record": {**RECORD, "member_number": "X"}}, message(), "invalid_field"),
         (
             {"ledger": FakeLedger(LedgerPermanent("idempotency_conflict", "L-1"))},
@@ -157,6 +169,44 @@ def test_an_event_behind_a_parked_one_parks_too_without_calling_the_ledger():
     assert svc.ledger.calls == []
 
 
+# ---------- corrections (RFC-0001 D10) ----------
+
+CORRECTION = {**RECORD, "revision": 2, "room_rate_cents": 50_000}  # 5,000 points; revision 1 earned 4,500
+
+
+def test_a_correction_credits_the_difference_under_its_own_key_and_posts_it():
+    svc = service(store=FakeStore(latest=LatestPosting(1, 4_500)), record=CORRECTION)
+    assert svc.handle(message()) is Outcome.POSTED
+    assert svc.ledger.calls == [("BR-0001:2", "GR-00001", "BR-0001", 500)]
+    assert svc.store.credited == [500]
+
+
+def test_a_correction_down_credits_a_negative_difference():
+    svc = service(store=FakeStore(latest=LatestPosting(1, 4_500)), record={**CORRECTION, "room_rate_cents": 30_000})
+    assert svc.handle(message()) is Outcome.POSTED
+    assert svc.ledger.calls[0][3] == -1_500 and svc.store.credited == [-1_500]
+
+
+def test_a_stale_revision_is_recorded_and_skipped_without_a_credit():
+    svc = service(store=FakeStore(latest=LatestPosting(3, 6_000)), record=CORRECTION)
+    assert svc.handle(message()) is Outcome.SKIPPED
+    assert svc.store.skips == [(RECORD["event_id"], 2, 3)]
+    assert svc.ledger.calls == [] and svc.store.writes == [] and svc.dead_letters.sent == []
+    assert 'posting_events_total{outcome="skipped"} 1.0' in svc.metrics.render().decode()
+
+
+def test_a_stale_revision_seen_again_is_a_duplicate():
+    svc = service(store=FakeStore(latest=LatestPosting(3, 6_000), skipped_new=False), record=CORRECTION)
+    assert svc.handle(message()) is Outcome.DUPLICATE
+
+
+def test_a_correction_before_its_original_is_parked_as_original_missing():
+    svc = service(store=FakeStore(latest=None), record=CORRECTION)
+    assert svc.handle(message()) is Outcome.PARKED
+    assert svc.store.parks == [(RECORD["event_id"], "permanent", "original_missing")]  # counted: dead at the max
+    assert svc.ledger.calls == []
+
+
 def test_a_redelivered_parked_event_is_a_duplicate():
     svc = service(store=FakeStore(parked_already=True))
     assert svc.handle(message()) is Outcome.DUPLICATE
@@ -174,6 +224,7 @@ def test_the_outbox_payload_has_its_own_fixed_id_and_the_source_event():
     a, b = outbox_payload(event, "L-1"), outbox_payload(event, "L-1")
     assert a["event_id"] != b["event_id"]  # a new message ID each time it's built, kept once stored
     assert (a["source_event_id"], a["stay_points"], a["credited_points"]) == (RECORD["event_id"], 4_500, 4_500)
+    assert outbox_payload(event, "L-1", credited=-200)["credited_points"] == -200  # a correction's difference
     assert (
         outbox_payload(event, "L-1", now=datetime(2026, 11, 17, tzinfo=UTC))["posted_at"] == 1_794_873_600_000
     )  # 2026-11-17T00:00Z in ms

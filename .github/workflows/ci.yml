@@ -56,6 +56,8 @@ jobs:
           done
       - name: Start the core stack (compose --wait fails if any service is unhealthy)
         run: docker compose --profile core up -d --build --wait --wait-timeout 300
+      - name: Schema gate (every committed version, local check and this job's registry; DEL-07)
+        run: uv run python -m app.pipeline.schema_check --registry http://127.0.0.1:8081
       - name: Infrastructure tests (a skipped or missing postgres/kafka test fails the job)
         run: uv run python scripts/run_integration.py
         env:

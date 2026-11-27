@@ -1,83 +1,71 @@
 # Session handoff
 
-**Updated:** 2026-11-27. M2 PR-B2b passed its 10× batch on a quiet machine (140/140, verification log M2 PR-B2b #28)
-and is pushed as a PR, auto-merging when CI is green. PR-C is being built on `m2/pr-c` (worktree
-`..\points-posting-investigator-prc`); its real-stack tests wait until the owner says the machine is free.
+**Updated:** 2026-11-27. **Milestone 2 is complete** once PR-C (#9) merges. Auto-merge is on, held by `main`'s five
+required checks. B2b merged as #8 (`41c02e3`). **Next: Milestone 3** (catalog, hypotheses, thresholds,
+pre-registration). It's design-heavy, so the plan comes first and waits for the owner's OK (rule 2).
 
-## Resume here (B2b)
-1. `git switch m2/parking-retry`; `scripts\stack.ps1 up` (9 services, incl. `retry-worker` and Kafka's test-only
-   `FAULTS` listener on `127.0.0.1:19093`).
-2. **Quiet check:**
-   `powershell -ExecutionPolicy Bypass -File scripts\quiet_check.ps1 -Minutes 5 -Out docs\evidence\m2-pr-b2b-quiet-check.md`.
-   Go on only if it says QUIET (exit 0); record it either way.
-3. **The 10× batch**, no code edits while it runs:
-   `scripts\repeat_tests.ps1 -Times 10 -Out docs\evidence\m2-pr-b2b-repeat-runs-final.md`, with these tests:
-   - the B2b parking tests: `poison_event_is_retried`, `per_member_order_holds_while_the_first`,
-     `crash_after_parking`, `worker_crash_after_the_credit`, `db_failure_inside_the_worker`,
-     `two_workers_never_claim`, `long_ledger_outage_never`, `ledger_outage_parks_the_event`
-   - B2a's `eight_concurrent_copies` and `eight_concurrent_resends`
-   - the producer tests: `topic_that_does_not_exist`, `unreachable_broker`, `producer_retries_add_no_duplicates`,
-     `without_idempotence`
+## Resume here
+1. **If #9 hasn't merged:** check its five checks. If one failed, read its log, fix on `m2/pr-c`, and push.
+2. **After #9 merges:** put the main checkout back on `main`, then delete the PR-C worktree (all of it is committed):
+   - `git switch main`; `git pull --ff-only`
+   - `git worktree remove ..\points-posting-investigator-prc`
 
-   Busy runs are flagged and re-run, never counted. Any failure means finding the cause before any PR.
-4. Add the results to the verification log (M2 PR-B2b, after #20). Then push, open the PR, wait for its five CI
-   checks, and auto-merge only when green. Stop the stack with `scripts\stack.ps1 down`.
-
-**What B2b changed** (verification log M2 PR-B2b #1–#20):
-- **Parking (ADR-0016):** parking table, retry worker, per-member order, retry topics removed.
-- **Producer silent loss found and fixed (ADR-0017; incident `docs/incidents/2026-11-26-producer-silent-loss.md`):**
-  the old producer reported success for events Kafka never took. Under fault injection the fixed producer gave
-  0 duplicates; without idempotence, the same fault gave 37.
-- **Offset-commit failure:** now a warning plus a metric, and the consumer keeps going.
-- **A new repeat script and quiet check.**
-- **Offline:** 311 tests pass, 81.31% coverage.
-- **Batch 1 was on the old code and a busy machine:** 4 tests at 9/10. Not yet repeated on the final code.
+   The main checkout is currently detached at `aa8563a` (PR-C), because only it has `.env`.
+3. **Then plan M3:** the 18-scenario catalog, `docs/hypotheses.md`, `benchmarks/thresholds.yaml`, the protocol, and
+   `tests/test_preregistration.py`, committed before any arm or investigator code.
 
 ## Where things stand
-- **Milestone 1 is complete** and on `main` (https://github.com/vamsialladev/points-posting-investigator, public;
-  secret scanning and push protection on; `main` requires the five CI checks, admins included, ADR-0013).
-- **Milestone 2 is in progress** (RFC-0001 and its approved changes; ADR-0010, ADR-0014, ADR-0015):
-  1. **PR-A, #3, merged:** the core stack (Kafka 4.4.0, Karapace 6.2.4, Postgres 16.15), the ledger mock, roles and
-     migrations, CI.
-  2. **PR-B1, #5, merged:** the outbox relay. Several relays each claim every member's oldest open row; publishing
-     is at least once; permanent failures are dead-lettered; `/metrics`; the `posting_relay` role.
-  3. **PR-B2a, #6, merged 2026-11-26:**
-     - the producer (headers `event_id`, `schema_version`, `correlation_id`, `traceparent`; keyed by member)
-     - the posting service:
-       - credits the ledger under the business key `stay_id:revision`
-       - writes the posting row and its outbox row in **one transaction**
-       - commits the Kafka offset only after it
-       - seeks back on database, ledger or dead-letter-topic failures
-       - dead-letters events that can never post, with their original bytes
-     - the `posting` container
-  4. **PR-B2b, built on `m2/parking-retry`, waiting for the 10× batch (see "Resume here"):**
-     - the parking table and retry worker (backoff, max attempts, then the dead-letter topic)
-     - per-member order under retries
-     - the retry topics removed
-     - the producer silent-loss fix and offset-commit failure handling
-  5. **PR-C:** corrections (revision > 1), the load generator and seeds, the schema gate, `docs/event-semantics.md`.
-- **PR-B2a checks** (`docs/verification-log.md`, M2 PR-B2a #1–#9):
-  - 275 offline tests pass (80.40% coverage); 53 real-stack tests pass; local CI 11/11
-  - **Repeat runs on the final code:** 8 crash and concurrency tests passed 10/10 each
-    (`docs/evidence/m2-pr-b2a-repeat-runs.md`)
-  - PR #6's five CI checks passed before auto-merge
-- **What B2b changes in B2a (once merged):**
-  - a transient ledger failure parks the event instead of holding up its partition
-  - a permanent refusal is retried up to 5 times before the dead-letter topic; a 409 is dead-lettered at once
-- **The stack is running** while B2b waits for its batch (see "Resume here"). Start it with `scripts\stack.ps1 up`; stop it with
-  `scripts\stack.ps1 down`; `scripts\stack.ps1 reset` deletes the data.
+- **The stack is stopped.** Postgres data is kept (`pgdata`, migrated to posting 0004); Kafka's topics went with the
+  container.
+  - `scripts\stack.ps1 up` starts it again, `down` stops it, `reset` deletes the data.
+  - Run `scripts\quiet_check.ps1` before any repeat batch.
+- **Milestone 1:** complete.
+- **Milestone 2:** five PRs (#3, #5, #6, #8, #9), RFC-0001 with ADR-0010 to ADR-0018.
+  - the pipeline: producer, posting service, transactional outbox and relay, idempotent ledger mock
+  - parking and the retry worker
+  - corrections
+  - seeds and the load generator
+  - the schema gate
+  - the semantics docs
 - **Secret deny rules at the project1 level** (ADR-0008, ADR-0009): `C:\projects\project1\.claude\settings.json`
-  (outside every repo, not committed) holds 368 deny rules. Every `*.env` file is refused to Read, Edit and Write,
-  and `.env.example` stays readable.
+  (outside every repo, not committed).
 - **Git identity:** every commit uses `339370878+vamsialladev@users.noreply.github.com`.
-- **No money spent.** Network use: Docker images, PyPI packages, the version lookups, and GitHub Actions (free on a
-  public repo).
+- **No money spent** in M2: local Docker, free GitHub Actions, no AI.
 
 ## Waiting on the owner
-1. **A quiet machine** for B2b's 10× batch. You're coordinating the other sessions; the batch starts only after a
-   5-minute QUIET result.
+1. **Your OK on the M3 plan**, once it's shown. No M3 code before that.
 2. **Your fresh-session canary test** is still pending on your side (verification log M1 #37).
 3. **Optional, on GitHub:** turn on Dependabot alerts, and "Block command line pushes that expose my email".
+
+## Milestone 2, in teaching-note form (spec Part N)
+- **What changed.** A checkout event travels from a simulated property system through Kafka to an idempotent ledger,
+  and on to `points.posted`:
+  - **Never silently lost:** the producer reports every delivery failure.
+  - **Never credited twice:** the ledger key is `stay_id:revision`, with `UNIQUE` in the database.
+  - **In order per member:** parking keeps order without blocking a partition.
+  - **Corrections credit only the difference.**
+- **Why.** M3's failure scenarios and M6's investigator need a pipeline that fails in realistic, recorded ways. Every
+  failure path writes stored rows (parked, skipped, dead-lettered), so the investigator can cite them.
+- **How to verify:**
+  - `scripts\test.ps1`: 358 offline tests
+  - `scripts\stack.ps1 up`, then `scripts\test_integration.ps1`: 68 real-stack tests
+  - `scripts\repeat_tests.ps1 -Times 10` on a quiet machine
+  - results: `docs/verification-log.md`, M2 sections
+- **Failure modes seen:**
+  - **The producer reported success for events Kafka refused** (ADR-0017, incident 2026-11-26). Found only by
+    10-times repeat runs.
+  - **A test can pass for the wrong reason:** the rebalance test sometimes ran without a rebalance. Its guard caught
+    it (6/10), and the setup was fixed.
+  - **A busy machine makes timing tests fail:** a 70-minute run had 7 failures from load. Hence the quiet check, and
+    flagged runs that aren't counted.
+  - **The stack's own health checks used 22.8% of the machine** until slowed down.
+  - **Random stay IDs collided** in the synthetic data.
+- **Exercise:** in `docs/owner-exercises.md` (M2).
+
+## Milestone 2 in three lines
+Changed: the full points pipeline (producer, posting service, outbox and relay, idempotent ledger, parking, corrections, load generator, schema gate) over 5 PRs, and a producer silent-loss bug found by repeat runs and fixed.
+Verified: 358 offline and 68 real-stack tests pass; on a quiet machine, 140/140 B2b repeat runs plus PR-C's new tests 10/10 each (the rebalance test after a setup fix); idempotent producer 0 duplicates vs 33–120 without; $0 spent.
+You: approve the M3 plan when I show it; your canary test is still pending; optional GitHub settings.
 
 ## Milestone 1, in teaching-note form (spec Part N)
 - **What changed.** The repo has its rules, its plan, a safe way to check settings, and a public home, but no product

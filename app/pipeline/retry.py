@@ -16,6 +16,8 @@ One cycle:
    - **permanent** (other ledger 4xx): `attempts` + 1 and backoff. At `max_attempts` the original bytes go to the DLQ
      topic (attempt N, the real first-failure time), and only then is the event marked `dead`.
    - **conflict** (ledger 409) or undecodable: dead-lettered at once.
+   - **original_missing** (a correction whose stay has nothing posted, D10): permanent, so dead-lettered at the max.
+5. **A stale revision** (at or below one already posted, D10) is recorded in `skipped_event` and marked done.
 
 A worker that dies mid-way leaves its claims `in_flight`. Another worker takes them once the lease runs out. Dead
 events are never replayed automatically (M7, with approval).
@@ -41,7 +43,7 @@ from sqlalchemy import Engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.pipeline import trace
-from app.pipeline.events import InvalidEvent, ledger_key, points_for, validate
+from app.pipeline.events import CreditKind, InvalidEvent, ledger_key, plan_credit, validate
 from app.pipeline.ledger_client import LedgerPermanent, LedgerTransient
 from app.pipeline.posting import DatabaseFailure, DeadLetterFailure, IncomingMessage, LeaseLost
 from app.pipeline.relay import backoff_delay
@@ -323,9 +325,16 @@ class RetryWorker:
         if self.postings.already_posted(event):
             self.parked.mark_done(self.config.worker_id, row)
             return "done"
+        plan = plan_credit(event, self.postings.latest_posting(event.stay_id))  # D10, the same rule as the consumer
+        if plan.kind == CreditKind.STALE:
+            self.postings.record_skipped(event, plan)  # once per event ID; then done, not credited
+            self.parked.mark_done(self.config.worker_id, row)
+            return "skipped"
+        if plan.kind == CreditKind.ORIGINAL_MISSING:
+            return self._fail(row, FailureKind.PERMANENT, "original_missing", f"no posting for {event.stay_id} yet")
         try:
             credit = self.ledger.credit(
-                ledger_key(event), event.member_number, event.stay_id, points_for(event), event.correlation_id
+                ledger_key(event), event.member_number, event.stay_id, plan.credited_points, event.correlation_id
             )
         except LedgerTransient as unavailable:
             return self._fail(
@@ -337,7 +346,14 @@ class RetryWorker:
         self._fault("after_ledger_credit")
         incoming = trace.context_from_headers(message.headers)
         context = {**incoming, "traceparent": trace.child(incoming.get("traceparent"))}
-        self.postings.write(event, credit.entry_id, context, fault=self.fault, parked=(self.config.worker_id, row.id))
+        self.postings.write(
+            event,
+            credit.entry_id,
+            context,
+            fault=self.fault,
+            parked=(self.config.worker_id, row.id),
+            credited=plan.credited_points,
+        )
         return "posted"
 
     def _fail(

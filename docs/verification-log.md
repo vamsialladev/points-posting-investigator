@@ -3,6 +3,24 @@
 Real results only, newest milestone first. Each row: what was checked, the exact command, and the result. Tool: Claude
 Code (Opus 5.5) did all of Milestone 1 and Milestone 2 so far.
 
+## Milestone 2, PR-C: corrections, seeds, the load generator, the schema gate (2026-11-27 onwards)
+Built under RFC-0001 as approved, adapted to parking (ADR-0018). Branch `m2/pr-c`, in its own worktree so B2b's batch
+never saw an edit. Local only, $0, no AI. **Real-stack tests not run yet:** the owner asked for unit tests only until
+the machine is free.
+
+| # | Check | Command | Result |
+|---|---|---|---|
+| 1 | Tests first | `b19528b` (tests only) against the old code: `pytest` on the 5 new or changed unit-test files (`.test-logs\prc-red.txt`, local) | all 5 files **failed at collection**: the code they test (`plan_credit`, `seed`, `loadgen`, `schema_check`) didn't exist. An import failure, not a behavioural one |
+| 2 | Offline checks on the code (`11135a5`) | `scripts\test.ps1` (`.test-logs\prc-offline.txt`, local) | **358 passed** (311 before PR-C), coverage **81.69%**; ruff, format and mypy clean |
+| 3 | A data bug found while writing seeds | reading `producer.synthetic_events` | it drew stay IDs at random, so two members could share one. The second stay was then taken for a duplicate (`UNIQUE(stay_id, revision)`) and refused (409). `seed.stays()` allocates them in sequence; `synthetic_events` now delegates to it |
+| 4 | Scope change confirmed by the owner (2026-11-27) | ADR-0018, `docs/backlog.md` | the ledger `members` table is deferred to M3 |
+| 5 | Real-stack tests written | `tests/test_posting_kafka.py` | corrections (1, 3, then a stale 2); a correction before its original → `original_missing` in the DLQ after 5 attempts; the posting role can't change a skipped event; a second consumer joining mid-stream (RFC-0001 test 13) |
+| 6 | Stack rebuilt with PR-C's code (owner's OK, 2026-11-27) | main checkout detached at `37cc600` (the only checkout with `.env`); `scripts\stack.ps1 up` | healthy in 21 s; the posting image has `plan_credit`, and the retry worker uses it; `db-init` migrated both databases and applied the grants |
+| 7 | **Every real-stack test, once** | `scripts\run_integration.py -vv` (`docs/evidence/m2-pr-c-full-suite.txt`) | **68 passed** in 3 min 54 s, including the 4 new tests |
+| 8 | 10× batch, the 4 new tests | `repeat_tests.ps1 -Times 10` (`docs/evidence/m2-pr-c-repeat-runs.md`) | corrections **10/10**; correction before its original **10/10**; skipped-event role **10/10**; **rebalance 6/10.** In all 10 rebalance runs, 60 postings and one credit per stay. The 4 failures were the test's own guard: the second consumer got no work, because the first finished all 60 before the rebalance completed. So those runs tested no rebalance (rule 7 working). Logs kept |
+| 9 | The rebalance test fixed | `bc6489e`: the first consumer pauses after 5 events (still polling, so still in the group) and resumes once it's given fewer partitions. No assertion changed; one guard added | — |
+| 10 | **The rebalance test, 10× after the fix** | `repeat_tests.ps1 -Times 10` (`docs/evidence/m2-pr-c-repeat-runs-rebalance-fixed.md`) | **10/10.** The second consumer took 25–30 of 60 events each run; **0 duplicates**, because each offset is committed right after its event, so a rebalance only redelivers an event in flight. That case is covered by the crash tests |
+
 ## Milestone 2, PR-B2b: parking, the retry worker, and the producer silent-loss fix (2026-11-26 onwards)
 Plan approved by the owner as written (2026-11-26). Local stack only, $0, no AI. Stored results are in
 `docs/evidence/m2-pr-b2b-*`. Branch `m2/parking-retry`, committed (`e5a773e`..), **not pushed, no PR**: the owner's rule
@@ -41,7 +59,7 @@ is no PR until every repeat test passes 10/10 on the final code, on a quiet mach
 | 28 | **The 10× batch on the final code** (`6d8c3ed`) | `repeat_tests.ps1 -Times 10`, 14 tests (`m2-pr-b2b-repeat-runs-final.md`) | **140/140: every test 10/10.** That covers all 8 B2b tests (poison, per-member order, crash after parking, worker crash after the credit, DB failure inside the worker, **two workers**, long outage, outage parks), B2a's 8 concurrent copies and resends, and the 4 producer tests. 3 runs were flagged (mean CPU 61–84 %), not counted, and re-run. 32 minutes. Producer test (c): 3 acks cut, **0 duplicates** in all 10 runs. The control without idempotence: 3 acks cut, **33–120 duplicates** in all 10 runs |
 | 29 | The two-workers anomaly against its root cause | row 28 | **10/10 on the fixed producer**, against 9/10 (6 posted, 4 lost) on the old one in batch 1 (#4). Consistent with the silent-loss root cause (#7). Not proof by itself: batch 1 also ran on a busy machine |
 
-Still to come here: the PR and its CI.
+| 30 | The PR and its CI | `gh pr create`; auto-merge with a merge commit (`gh pr merge 8 --auto --merge`), held by `main`'s protection | [#8](https://github.com/vamsialladev/points-posting-investigator/pull/8): all 5 checks passed; merged 2026-11-27 15:51 UTC as `41c02e3` |
 
 ## Milestone 2, PR-B2a: the producer and the posting service (2026-11-23 to 2026-11-24)
 Plan approved by the owner as written (2026-11-23), with four changes to RFC-0001 (ADR-0015). Local stack only, $0,

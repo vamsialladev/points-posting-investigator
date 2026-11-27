@@ -1,0 +1,77 @@
+stack settings: 6/6 set
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.2.0, pluggy-1.7.0 -- C:\projects\project1\points-posting-investigator\.venv\Scripts\python.exe
+rootdir: C:\projects\project1\points-posting-investigator
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.16.0, platformdirs-4.14.5, cov-7.1.0
+collecting ... collected 426 items / 425 deselected / 1 selected
+
+%4|1795797200.238|CONFWARN|rdkafka#producer-2| [thrd:app]: Configuration property enable.gapless.guarantee is experimental: When set to `true`, any error that could result in a gap in the produced message series when a batch of messages fails, will raise a fatal error (ERR__GAPLESS_GUARANTEE) and stop the producer. Messages failing due to `message.timeout.ms` are not covered by this guarantee. Requires `enable.idempotence=true`.
+tests/test_posting_kafka.py::test_a_second_consumer_joining_mid_stream_loses_nothing_and_credits_nothing_twice FAILED
+
+================================== FAILURES ===================================
+_ test_a_second_consumer_joining_mid_stream_loses_nothing_and_credits_nothing_twice _
+
+db = {'posting': Engine(postgresql+psycopg://test_posting_app:***@127.0.0.1:5432/test_posting?connect_timeout=10), 'relay':..._timeout=10), 'ledger': Engine(postgresql+psycopg://test_ledger_app:***@127.0.0.1:5432/test_ledger?connect_timeout=10)}
+ledger = ('http://127.0.0.1:55761', '9wgm-8oruc7xwLKdfLImcggF')
+kafka = '127.0.0.1:9092'
+registry = <confluent_kafka.schema_registry._sync.schema_registry_client.SchemaRegistryClient object at 0x000002B70BC15370>
+scratch = {'input': 'test.in.8b6ccefe60', 'output': 'test.out.8b6ccefe60', 'dlq': 'test.dlq.8b6ccefe60'}
+
+    def test_a_second_consumer_joining_mid_stream_loses_nothing_and_credits_nothing_twice(
+        db, ledger, kafka, registry, scratch
+    ):
+        """RFC-0001 test 13 (TEST-02): a rebalance redelivers what wasn't committed; each stay is still credited once."""
+        records = [stay(f"GR-{m:05d}", m * 10 + n) for m in range(1, 21) for n in (1, 2, 3)]  # 60 stays, 20 members
+        producer = checkout_producer(kafka, registry, scratch["input"])
+        for rec in records:
+            producer.send(rec, flush=False)
+        producer.flush()
+        group = "g-" + uuid.uuid4().hex[:6]
+        loops = [
+            make_loop(
+                make_service(db["posting"], *ledger, kafka, registry, scratch["output"], scratch["dlq"], wrap=SlowLedger),
+                kafka,
+                group,
+                scratch["input"],
+            )
+            for _ in range(2)
+        ]
+        handled: list[list[Outcome]] = [[], []]
+        stop = threading.Event()
+    
+        def consume(i: int) -> None:
+            while not stop.is_set():
+                outcome = loops[i].run_once(timeout=0.5)
+                if outcome is not None:
+                    handled[i].append(outcome)
+    
+        first = threading.Thread(target=consume, args=(0,))
+        first.start()
+        deadline = time.monotonic() + 60
+        while len(handled[0]) < 10 and time.monotonic() < deadline:
+            time.sleep(0.05)
+        second = threading.Thread(target=consume, args=(1,))  # joins the group: a rebalance, mid-stream
+        second.start()
+        while counts(db["posting"])[0] < 60 and time.monotonic() < deadline + 60:
+            time.sleep(0.2)
+        stop.set()
+        first.join(10)
+        second.join(10)
+        for loop in loops:
+            loop.consumer.close()
+    
+        assert counts(db["posting"]) == (60, 60)
+        with db["ledger"].connect() as conn:
+            assert credit_problems(conn, expected_credits(*records)) == []
+>       assert handled[1].count(Outcome.POSTED) >= 1, "the second consumer never got a partition: no rebalance happened"
+E       AssertionError: the second consumer never got a partition: no rebalance happened
+E       assert 0 >= 1
+E        +  where 0 = <built-in method count of list object at 0x000002B70DC38540>(<Outcome.POSTED: 'posted'>)
+E        +    where <built-in method count of list object at 0x000002B70DC38540> = [].count
+E        +    and   <Outcome.POSTED: 'posted'> = Outcome.POSTED
+
+tests\test_posting_kafka.py:120: AssertionError
+===================== 1 failed, 425 deselected in 11.10s ======================
+repeat_tests: exit code 1 after 18 s; mean CPU 23.4 %

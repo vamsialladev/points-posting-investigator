@@ -1,0 +1,59 @@
+﻿
+=================================== ERRORS ====================================
+_________________ ERROR collecting tests/test_posting_unit.py _________________
+ImportError while importing test module 'C:\projects\project1\points-posting-investigator-prc\tests\test_posting_unit.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\Vamsi\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_posting_unit.py:14: in <module>
+    from app.pipeline.events import (
+E   ImportError: cannot import name 'CreditKind' from 'app.pipeline.events' (C:\projects\project1\points-posting-investigator-prc\app\pipeline\events.py)
+_____________ ERROR collecting tests/test_posting_service_unit.py _____________
+ImportError while importing test module 'C:\projects\project1\points-posting-investigator-prc\tests\test_posting_service_unit.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\Vamsi\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_posting_service_unit.py:15: in <module>
+    from app.pipeline.events import LatestPosting, validate
+E   ImportError: cannot import name 'LatestPosting' from 'app.pipeline.events' (C:\projects\project1\points-posting-investigator-prc\app\pipeline\events.py)
+__________________ ERROR collecting tests/test_retry_unit.py __________________
+ImportError while importing test module 'C:\projects\project1\points-posting-investigator-prc\tests\test_retry_unit.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\Vamsi\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_retry_unit.py:10: in <module>
+    from app.pipeline.events import LatestPosting
+E   ImportError: cannot import name 'LatestPosting' from 'app.pipeline.events' (C:\projects\project1\points-posting-investigator-prc\app\pipeline\events.py)
+_________________ ERROR collecting tests/test_loadgen_unit.py _________________
+ImportError while importing test module 'C:\projects\project1\points-posting-investigator-prc\tests\test_loadgen_unit.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\Vamsi\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_loadgen_unit.py:9: in <module>
+    from app.pipeline import seed
+E   ImportError: cannot import name 'seed' from 'app.pipeline' (C:\projects\project1\points-posting-investigator-prc\app\pipeline\__init__.py)
+______________ ERROR collecting tests/test_schema_check_unit.py _______________
+ImportError while importing test module 'C:\projects\project1\points-posting-investigator-prc\tests\test_schema_check_unit.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\Vamsi\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_schema_check_unit.py:11: in <module>
+    from app.pipeline.schema_check import backward_problems, check_committed, check_registry, main
+E   ModuleNotFoundError: No module named 'app.pipeline.schema_check'
+=========================== short test summary info ===========================
+ERROR tests/test_posting_unit.py
+ERROR tests/test_posting_service_unit.py
+ERROR tests/test_retry_unit.py
+ERROR tests/test_loadgen_unit.py
+ERROR tests/test_schema_check_unit.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 5 errors during collection !!!!!!!!!!!!!!!!!!!
