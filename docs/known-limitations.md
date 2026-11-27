@@ -74,11 +74,12 @@ Kept current at every milestone. Each line says what is limited, why, and what w
   retry gets the same entry back (the key is the stay) and writes the rows. It can never hold two credits.
 - **A database failure still blocks its partition.** Parking needs the database, so on a database failure the consumer
   seeks back and retries the same message. Since B2b, every other failure parks instead (ADR-0016).
-- **Corrections (revision > 1) are dead-lettered as `unsupported_revision`** until PR-C builds the difference rule.
+- ~~Corrections (revision > 1) are dead-lettered as `unsupported_revision`.~~ Fixed in PR-C: corrections credit the
+  difference (ADR-0018).
 - **Dead letters are at least once.** The DLQ message is published before the offset commit. A crash between the two
   publishes it again; DLQ readers should dedupe on `event_id` plus the original offset.
-- **One posting service instance** runs in the stack. Two in one consumer group (a rebalance) aren't tested yet:
-  that's TEST-02, in PR-C.
+- **One posting service instance** runs in the stack. A second consumer joining the group (a rebalance) is tested in
+  PR-C (`test_a_second_consumer_joining_mid_stream_loses_nothing_and_credits_nothing_twice`).
 - **The stack's smoke tests leave rows behind** (member `GR-09998` / `GR-09999`) in the stack's own databases.
   `scripts\stack.ps1 reset` clears them.
 
@@ -94,3 +95,14 @@ Kept current at every milestone. Each line says what is limited, why, and what w
 - **A stack created before B2b keeps three unused `.retry.N` topics** until the Kafka container is recreated.
 - **Transient failures in the tests are injected** for chosen stays, in front of the real ledger client
   (`FlakyLedger`). Permanent failures are real: a stay over the ledger's points limit gets the ledger's own 422.
+
+## Added in Milestone 2, PR-C: corrections, seeds, the load generator, the schema gate (2026-11-27)
+- **A correction that arrives before its original holds up that member.** The original parks behind it and posts only
+  once the correction is dead-lettered (`original_missing`, after 5 attempts, a few seconds). The correction then
+  needs a replay (M7). Tech debt #5.
+- **The local schema check is structural:** flat records, exact logical types. The registry is the authority.
+- **The load generator's hard caps** (200 events a second, 10,000 a run) refuse larger runs; they aren't measured
+  throughput limits.
+- **The ledger `members` table is deferred to M3** (ADR-0018, owner confirmed). The ledger doesn't validate members.
+- **PR-C's real-stack tests** (corrections, original_missing, the skipped-event role, the rebalance) waited for a free
+  machine; their results are in the verification log once run.

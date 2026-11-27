@@ -5,6 +5,7 @@ app over HTTP (ADR-0015). Crash and concurrency tests are run 10 times by script
 from __future__ import annotations
 
 import threading
+import time
 import uuid
 
 import pytest
@@ -57,6 +58,72 @@ def test_one_event_gives_one_posting_one_outbox_row_and_one_published_message(db
     assert message.value["source_event_id"] == sent.event_id == rec["event_id"]
     assert message.value["credited_points"] == 2_000
     assert trace.trace_id(message.headers["traceparent"]) == trace.trace_id(sent.traceparent)
+
+
+class SlowLedger:
+    """The real ledger client, 50 ms slower per credit, so a rebalance happens while work is still left."""
+
+    def __init__(self, client):
+        self.client = client
+
+    def credit(self, *args):
+        time.sleep(0.05)
+        return self.client.credit(*args)
+
+
+def test_a_second_consumer_joining_mid_stream_loses_nothing_and_credits_nothing_twice(
+    db, ledger, kafka, registry, scratch
+):
+    """RFC-0001 test 13 (TEST-02): a rebalance redelivers what wasn't committed; each stay is still credited once."""
+    records = [stay(f"GR-{m:05d}", m * 10 + n) for m in range(1, 21) for n in (1, 2, 3)]  # 60 stays, 20 members
+    producer = checkout_producer(kafka, registry, scratch["input"])
+    for rec in records:
+        producer.send(rec, flush=False)
+    producer.flush()
+    group = "g-" + uuid.uuid4().hex[:6]
+    loops = [
+        make_loop(
+            make_service(db["posting"], *ledger, kafka, registry, scratch["output"], scratch["dlq"], wrap=SlowLedger),
+            kafka,
+            group,
+            scratch["input"],
+        )
+        for _ in range(2)
+    ]
+    handled: list[list[Outcome]] = [[], []]
+    stop = threading.Event()
+
+    def consume(i: int) -> None:
+        while not stop.is_set():
+            outcome = loops[i].run_once(timeout=0.5)
+            if outcome is not None:
+                handled[i].append(outcome)
+
+    first = threading.Thread(target=consume, args=(0,))
+    first.start()
+    deadline = time.monotonic() + 60
+    while len(handled[0]) < 10 and time.monotonic() < deadline:
+        time.sleep(0.05)
+    second = threading.Thread(target=consume, args=(1,))  # joins the group: a rebalance, mid-stream
+    second.start()
+    while counts(db["posting"])[0] < 60 and time.monotonic() < deadline + 60:
+        time.sleep(0.2)
+    stop.set()
+    first.join(10)
+    second.join(10)
+    for loop in loops:
+        loop.consumer.close()
+
+    assert counts(db["posting"]) == (60, 60)
+    with db["ledger"].connect() as conn:
+        assert credit_problems(conn, expected_credits(*records)) == []
+    assert handled[1].count(Outcome.POSTED) >= 1, "the second consumer never got a partition: no rebalance happened"
+    posted = handled[0].count(Outcome.POSTED) + handled[1].count(Outcome.POSTED)
+    assert posted == 60  # a redelivery after the rebalance is a DUPLICATE, never a second POSTED
+    print(
+        f"evidence: first consumer {len(handled[0])} handled, second {len(handled[1])}; duplicates "
+        f"{handled[0].count(Outcome.DUPLICATE) + handled[1].count(Outcome.DUPLICATE)}"
+    )
 
 
 # ---------- crashes and failures ----------
