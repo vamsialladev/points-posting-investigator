@@ -120,5 +120,7 @@ Kept current at every milestone. Each line says what is limited, why, and what w
 - **The order test needs full git history.** It fails on a shallow clone, by design; CI's `checks` job now fetches
   everything.
 - **The ledger `members` table moves to v2** (ADR-0019): no pre-registered scenario needs an unknown member.
+- **A 10/10 local repeat run didn't catch a timing race** that a faster CI runner hit (verification log M3 #7). The
+  M2 repeat runs show stability on the owner's machine, not on every machine.
 - **The predictions are the builder's.** Which scenarios the rules handle alone (9 of 18) was written by Claude Code
   from the M2 code, with nobody else reviewing it.
