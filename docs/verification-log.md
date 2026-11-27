@@ -3,6 +3,17 @@
 Real results only, newest milestone first. Each row: what was checked, the exact command, and the result. Tool: Claude
 Code (Opus 5.5) did all of Milestone 1 and Milestone 2. Claude Code (Fable 5.2) does Milestone 3 onwards (RFC-0002).
 
+## Milestone 3, Phase 2: scenarios, offline parts (2026-11-27 onwards)
+RFC-0002 Phase 2. Branch `m3/scenario-plans`. Pure code and data so far; **no stack run yet**, so no scenario has
+been triggered for real. Local only, $0, no AI.
+
+| # | Check | Command | Result |
+|---|---|---|---|
+| 1 | Scenario plans | `scripts/test.ps1` at `908e5ba` (`.test-logs/m3-phase2a-offline.txt`, local) | **469 passed, 68 skipped**; coverage 84.02%. 96 new tests: every plan is the same each time, two runs share no member, stay or event ID, every valid event passes the pipeline's own validation, every reset restores every knob its trigger moved, and `app/scenarios/catalog.py` equals `docs/failure-catalog.md` |
+| 2 | Lag and alert rules | `scripts/test.ps1` at `36212aa` (`.test-logs/m3-phase2b-offline.txt`, local) | **495 passed, 68 skipped**; coverage 84.71%. 26 new tests: lag from committed offsets and watermarks; the reader uses only read calls (a fake consumer with nothing else); each rule fires on its own signal and only then; a missing signal is `not_evaluated`; the loader refuses 11 malformed documents |
+| 3 | A pre-registered file corrected before the freeze | `uv run python scripts/prereg_lock.py --write`, in its own commit | the catalog said triggers take `--seed`; they take `--run` (each run owns its members and stays). No ground truth changed. The lock was rewritten in the same commit; nothing exists under `app/arms/` or `app/investigator/` |
+| 4 | **Not yet done** | none | the executor, the `ops` database, Kafka SASL and ACLs, and any real-stack run of a trigger or reset. FAIL-01 to FAIL-18 stay `Planned (M3)` |
+
 ## Milestone 3, Phase 1: the plan and the pre-registration (2026-11-27)
 RFC-0002, approved by the owner on 2026-11-27 (ADR-0019). Branch `m3/plan-and-preregistration`. Documents and one
 test file; no code under `app/`. Local only, $0, no AI, no stack run.

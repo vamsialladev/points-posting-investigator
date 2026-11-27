@@ -1,6 +1,6 @@
 {
   "sha256": {
-    "docs/failure-catalog.md": "f8ede147f97deb2d1fec7e2462bb92884cd95d9377db425795bc9679de8694db",
+    "docs/failure-catalog.md": "4f741de0b0d2048b1cddfdda8247dced05c70af0bae79502caa81883c290d1b9",
     "docs/hypotheses.md": "b1e566eedfb66b5ca92197d6a0983409f88c0ce2234fcf8874404a0e4ec5c5cf",
     "docs/benchmark-protocol.md": "32f3261c9bb441c81572cf266522692756dc7c6e2238a04d0df5652b86a37a10",
     "benchmarks/thresholds.yaml": "cad4056624513f56c7ac1b375f06fc2ec2ac87ea232c9a8b6b8e19587d6c9d08"

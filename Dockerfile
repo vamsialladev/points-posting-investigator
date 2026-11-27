@@ -18,6 +18,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY app ./app
 COPY migrations ./migrations
 COPY schemas ./schemas
+COPY ops ./ops
 
 RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin app
 USER 10001

@@ -6,7 +6,7 @@ complete. The owner's "Milestone 3" (a read-only AI investigator plus human-appr
 
 ## Start of the next session
 1. Read `CLAUDE.md`, `docs/implementation-status.md`, this file, **RFC-0002** and `docs/failure-catalog.md`.
-2. Run `scripts\test.ps1`: it should give **373 passed, 68 skipped**, coverage 81.69%.
+2. Run `scripts\test.ps1`: it should give **495 passed, 68 skipped**, coverage 84.71% (plus 2 once PR #12 is merged in).
 3. Continue with the first phase below that isn't done. The plan is approved: no new approval is needed for a
    phase, only for what "Standing orders" lists.
 
@@ -28,8 +28,8 @@ complete. The owner's "Milestone 3" (a read-only AI investigator plus human-appr
 | Phase | Content | State |
 |---|---|---|
 | 0 | RFC-0002, ADR-0019 | done (`49dc098`) |
-| 1 | Pre-registration: catalog, hypotheses, thresholds, protocol, lock, order test | done (`4828940`); 373 offline tests pass |
-| 2 | Trigger and reset for all 18 scenarios (`python -m app.scenarios`); `log_event`, `change_event`, the lag reader, alert rules as YAML; Kafka SASL and ACLs | **next**. Offline parts first; the real-stack batch needs the quiet check and the owner's OK |
+| 1 | Pre-registration: catalog, hypotheses, thresholds, protocol, lock, order test | done (`4828940`), PR #11 |
+| 2 | Trigger and reset for all 18 scenarios (`python -m app.scenarios`); `log_event`, `change_event`, the lag reader, alert rules as YAML; Kafka SASL and ACLs | **in progress**: see "Phase 2, piece by piece" |
 | 3 | Minimal rules baseline (`app/arms/`) | not started. **The first commit here freezes the pre-registration** |
 | 4 | Investigator (`app/investigator/`): tools, loop, citations, mock and hostile-mock providers, audit, GenAI spans | not started |
 | 5 | Proposal, approval bound to the message-set hash, replay through the idempotent path | not started |
@@ -39,12 +39,25 @@ complete. The owner's "Milestone 3" (a read-only AI investigator plus human-appr
 **Before Phase 3's first commit,** any correction to a pre-registered file needs
 `uv run python scripts/prereg_lock.py --write` in the same commit. After it, those files don't change.
 
-## Design notes for Phase 2 (decided, not yet built)
-- **Triggers** use the knobs in the table below, write a manifest to `.scenario-runs/` (git-ignored), and take
-  `--seed`. S07 takes the posting role's login away instead of pausing Postgres, so the ledger's database stays up.
-- **S12** needs a ledger-timeout setting on the posting service (the client's `timeout` is a constructor argument,
-  5.0 s by default, with no environment variable yet).
-- **S13** needs a clock offset in the load generator (`occurred_at`).
+## Phase 2, piece by piece
+| Piece | State |
+|---|---|
+| Plans for all 18 scenarios as pure data (`app/scenarios/`: `catalog.py`, `steps.py`, `plans.py`); `python -m app.scenarios list` and `plan <id> [--run N] [--pair A]` | done, offline-tested (`908e5ba`). Each run owns 50 members (GR-30000 up) and 80 stays (BR/ML-0100 up), so nothing is deleted between runs |
+| Lag calculation and a read-only reader (`app/ops/lag.py`); alert rules (`ops/alert-rules.yaml`) and evaluator (`app/ops/alerts.py`) | done, offline-tested (`36212aa`). The reader isn't yet run against real Kafka |
+| The `ops` database: `log_event`, `change_event`, `member_question`, `alert_evaluation`, `runbook_section`, with an insert-only writer role; a log handler in each service | **not started**. Adds a database password to `.env` (`scripts
+ew_env.ps1 -AddMissing`): ask the owner first |
+| The executor that runs a plan against the stack (`trigger`, `reset`, the manifest in `.scenario-runs/`), `scripts\scenario.ps1`, a `LEDGER_TIMEOUT_SECONDS` setting on the posting service and retry worker (S12), a signal snapshot for the alert evaluator | **not started** |
+| Kafka SASL and ACLs, in its own PR | **not started**. Adds Kafka passwords to `.env`; the 68 real-stack tests must pass before merge |
+| The real-stack batch: every scenario triggers and resets | **not started**. Quiet check and the owner's OK first |
+
+## Design notes for Phase 2
+- **S07** takes the posting role's login away instead of pausing Postgres, so the ledger's database stays up.
+- **S12** changes the ledger timeout of the posting service **and** the retry worker (otherwise the worker's normal
+  timeout would post the parked events at once), and writes the change record first.
+- **S03 takes about a minute to trigger:** each timed-out event costs the single-threaded consumer about 16 s (a 5 s
+  timeout, two 5 s lookups, the settle time).
+- **A CI-only timing race was found and fixed** (PR #12): tests that need the retry worker to reach a fault point
+  must use `first_claim(worker)`, never a single `run_once()` straight after parking.
 - **Replay (Phase 5):** the posting service reports an already-parked event ID as a duplicate, so a dead parked
   event is replayed by re-opening it for the retry worker, not by sending it to the main topic again.
 - **The investigator reads the ledger's database, never its API,** so it never holds the token that can credit.
