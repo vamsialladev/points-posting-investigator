@@ -3,7 +3,7 @@
 #   powershell -ExecutionPolicy Bypass -File scripts\stack.ps1 up       # build, start, wait until healthy
 #   powershell -ExecutionPolicy Bypass -File scripts\stack.ps1 status
 #   powershell -ExecutionPolicy Bypass -File scripts\stack.ps1 logs
-#   powershell -ExecutionPolicy Bypass -File scripts\stack.ps1 down     # stop; data kept
+#   powershell -ExecutionPolicy Bypass -File scripts\stack.ps1 down     # stop; Postgres data kept (volume), Kafka topics and messages are not (no Kafka volume)
 #   powershell -ExecutionPolicy Bypass -File scripts\stack.ps1 reset    # stop and DELETE the local data volume
 # Compose reads .env itself; this script never reads or prints it.
 param([ValidateSet("up", "status", "logs", "down", "reset")][string]$Action = "up")
