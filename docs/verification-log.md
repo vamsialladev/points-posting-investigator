@@ -3,6 +3,19 @@
 Real results only, newest milestone first. Each row: what was checked, the exact command, and the result. Tool: Claude
 Code (Opus 5.5) did all of Milestone 1 and Milestone 2 so far.
 
+## Milestone 2, PR-C: corrections, seeds, the load generator, the schema gate (2026-11-27 onwards)
+Built under RFC-0001 as approved, adapted to parking (ADR-0018). Branch `m2/pr-c`, in its own worktree so B2b's batch
+never saw an edit. Local only, $0, no AI. **Real-stack tests not run yet:** the owner asked for unit tests only until
+the machine is free.
+
+| # | Check | Command | Result |
+|---|---|---|---|
+| 1 | Tests first | `b19528b` (tests only) against the old code: `pytest` on the 5 new or changed unit-test files (`.test-logs\prc-red.txt`, local) | all 5 files **failed at collection**: the code they test (`plan_credit`, `seed`, `loadgen`, `schema_check`) didn't exist. An import failure, not a behavioural one |
+| 2 | Offline checks on the code (`11135a5`) | `scripts\test.ps1` (`.test-logs\prc-offline.txt`, local) | **358 passed** (311 before PR-C), coverage **81.69%**; ruff, format and mypy clean |
+| 3 | A data bug found while writing seeds | reading `producer.synthetic_events` | it drew stay IDs at random, so two members could share one. The second stay was then taken for a duplicate (`UNIQUE(stay_id, revision)`) and refused (409). `seed.stays()` allocates them in sequence; `synthetic_events` now delegates to it |
+| 4 | Scope change confirmed by the owner (2026-11-27) | ADR-0018, `docs/backlog.md` | the ledger `members` table is deferred to M3 |
+| 5 | Real-stack tests written, **not run** | `tests/test_posting_kafka.py` | corrections (1, 3, then a stale 2); a correction before its original → `original_missing` in the DLQ after 5 attempts; the posting role can't change a skipped event; a second consumer joining mid-stream (RFC-0001 test 13). Waiting for the owner's OK to use the machine |
+
 ## Milestone 2, PR-B2b: parking, the retry worker, and the producer silent-loss fix (2026-11-26 onwards)
 Plan approved by the owner as written (2026-11-26). Local stack only, $0, no AI. Stored results are in
 `docs/evidence/m2-pr-b2b-*`. Branch `m2/parking-retry`, committed (`e5a773e`..), **not pushed, no PR**: the owner's rule
