@@ -1,0 +1,15 @@
+﻿round 1: handled 60/60 in 60 handle calls; outcomes {'parked': 60}; flaky counters left non-zero: 0
+round 2: handled 60/60 in 60 handle calls; outcomes {'parked': 60}; flaky counters left non-zero: 0
+round 3: handled 60/60 in 60 handle calls; outcomes {'parked': 60}; flaky counters left non-zero: 0
+uv : %6|1795735955.341|BGQUEUE|rdkafka#producer-20| [thrd:background]: Purging 1 unserved events from background queue
+At line:1 char:302
++ ... tch {} } }; uv run python "C:\Users\Vamsi\AppData\Local\Temp\claude\a ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (%6|1795735955.3...ackground queue:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+round 4: handled 60/60 in 60 handle calls; outcomes {'parked': 60}; flaky counters left non-zero: 0
+round 5: handled 60/60 in 60 handle calls; outcomes {'parked': 60}; flaky counters left non-zero: 0
+round 6: handled 60/60 in 60 handle calls; outcomes {'parked': 60}; flaky counters left non-zero: 0
+round 7: handled 60/60 in 60 handle calls; outcomes {'parked': 60}; flaky counters left non-zero: 0
+round 8: handled 60/60 in 60 handle calls; outcomes {'parked': 60}; flaky counters left non-zero: 0

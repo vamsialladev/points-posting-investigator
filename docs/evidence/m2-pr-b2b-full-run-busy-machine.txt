@@ -1,0 +1,525 @@
+﻿stack settings: 6/6 set
+..............................F...FF......FF...F................F        [100%]
+================================== FAILURES ===================================
+__________ test_per_member_order_holds_while_the_first_event_retries __________
+
+db = {'posting': Engine(postgresql+psycopg://test_posting_app:***@127.0.0.1:5432/test_posting?connect_timeout=10), 'relay':..._timeout=10), 'ledger': Engine(postgresql+psycopg://test_ledger_app:***@127.0.0.1:5432/test_ledger?connect_timeout=10)}
+ledger = ('http://127.0.0.1:60168', 'Gk07wQrdLtPVHAvqAd0AT7pC')
+kafka = '127.0.0.1:9092'
+registry = <confluent_kafka.schema_registry._sync.schema_registry_client.SchemaRegistryClient object at 0x0000018815E56630>
+scratch = {'input': 'test.in.5f20400375', 'output': 'test.out.5f20400375', 'dlq': 'test.dlq.5f20400375'}
+
+    def test_per_member_order_holds_while_the_first_event_retries(db, ledger, kafka, registry, scratch):
+        mine = [stay("GR-00001", n) for n in (1, 2, 3, 4)]
+        theirs = [stay("GR-00002", n) for n in (5, 6)]
+        producer = checkout_producer(kafka, registry, scratch["input"])
+        for rec in mine[:2] + theirs[:1] + mine[2:] + theirs[1:]:  # interleaved
+            producer.send(rec)
+        flaky = {mine[0]["stay_id"]: 1}  # the consumer's one try fails; then the worker's first 2 fail too
+    
+        loop = consumer_for(db, ledger, kafka, registry, scratch, wrap=lambda c: FlakyLedger(c, flaky))
+        outcomes = run_until(loop, 6)
+        assert outcomes.count(Outcome.PARKED) == 4 and outcomes.count(Outcome.POSTED) == 2  # mine parked, theirs posted
+    
+        worker = make_worker(db, ledger, kafka, registry, scratch, wrap=lambda c: FlakyLedger(c, {mine[0]["stay_id"]: 2}))
+        drain_parked(worker, db)
+        assert postings_in_order(db["posting"]) == {
+            "GR-00002": [r["stay_id"] for r in theirs],
+            "GR-00001": [r["stay_id"] for r in mine],
+        }
+        first = next(r for r in parked_rows(db["posting"]) if r["event_id"] == mine[0]["event_id"])
+        assert (first["attempts"], first["transient_failures"]) == (0, 3)  # outages are counted, never toward dead
+    
+        relay = make_relay("r1", kafka, registry, db["relay"], scratch["output"])
+        drain([relay], lambda: open_rows(db["relay"]) == 0)
+        received = read_topic(kafka, registry, scratch["output"], at_least=6)
+        order = per_member_order(received)  # stay_points per member, in partition order
+        points = {r["stay_id"]: (r["room_rate_cents"] * 10) // 100 for r in mine + theirs}
+>       assert order["GR-00001"] == [points[r["stay_id"]] for r in mine]
+               ^^^^^^^^^^^^^^^^^
+E       KeyError: 'GR-00001'
+
+tests\test_parking_kafka.py:120: KeyError
+___ test_two_workers_never_claim_the_same_parked_event_and_each_posts_once ____
+
+db = {'posting': Engine(postgresql+psycopg://test_posting_app:***@127.0.0.1:5432/test_posting?connect_timeout=10), 'relay':..._timeout=10), 'ledger': Engine(postgresql+psycopg://test_ledger_app:***@127.0.0.1:5432/test_ledger?connect_timeout=10)}
+ledger = ('http://127.0.0.1:60446', 'L9OWh7WvGLBSs9R1UcGJVgMj')
+kafka = '127.0.0.1:9092'
+registry = <confluent_kafka.schema_registry._sync.schema_registry_client.SchemaRegistryClient object at 0x0000018815E56630>
+scratch = {'input': 'test.in.6e45d259da', 'output': 'test.out.6e45d259da', 'dlq': 'test.dlq.6e45d259da'}
+
+    def test_two_workers_never_claim_the_same_parked_event_and_each_posts_once(db, ledger, kafka, registry, scratch):
+        members = [f"GR-{m:05d}" for m in range(1, 13)]
+        records = {m: [stay(m, i * 100 + n) for n in range(1, 6)] for i, m in enumerate(members, start=1)}  # 60 events
+        producer = checkout_producer(kafka, registry, scratch["input"])
+        for n in range(5):
+            for m in members:
+                producer.send(records[m][n], flush=False)
+        producer.flush()
+        first_fails = {records[m][0]["stay_id"]: 1 for m in members}  # each member's first event parks; the rest follow
+        loop = consumer_for(db, ledger, kafka, registry, scratch, wrap=lambda c: FlakyLedger(c, first_fails))
+>       assert run_until(loop, 60, timeout=120).count(Outcome.PARKED) == 60
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_parking_kafka.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\posting_helpers.py:179: in run_until
+    outcome = loop.run_once(timeout=0.5)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <app.pipeline.posting.PostingConsumer object at 0x00000188166C07A0>
+timeout = 0.5
+
+    def run_once(self, timeout: float = 1.0) -> Outcome | None:
+        message = self.consumer.poll(timeout)
+        if message is None:
+            return None
+        if message.error() is not None:
+            log.warning("consumer error: %s", message.error())
+            return None
+        incoming = IncomingMessage.from_kafka(message)
+        try:
+            outcome: Outcome = self.service.handle(incoming)
+        except RETRYABLE as failure:
+            # Nothing committed: go back to this same message and try again after a growing, jittered wait.
+            self.consumer.seek(TopicPartition(incoming.topic, incoming.partition, incoming.offset))
+            self.consecutive_failures += 1
+            config = getattr(self.service, "config", PostingConfig())
+            step = min(config.retry_cap, config.retry_base * 2 ** (self.consecutive_failures - 1))
+            self.sleep(step / 2 + self.rand() * step / 2)
+            metrics = getattr(self.service, "metrics", None)
+            if metrics is not None:
+                metrics.retries.labels(reason=type(failure).__name__).inc()
+            return Outcome.RETRY
+        self._fault("after_db_commit_before_offset_commit")
+>       self.consumer.commit(message=message, asynchronous=False)
+E       cimpl.KafkaException: KafkaError{code=_WAIT_COORD,val=-180,str="Commit failed: Local: Waiting for coordinator"}
+
+app\pipeline\posting.py:473: KafkaException
+__________ test_a_long_ledger_outage_never_dead_letters_a_good_event __________
+
+    @contextlib.contextmanager
+    def map_httpcore_exceptions() -> Generator[None]:
+        global HTTPCORE_EXC_MAP
+        if len(HTTPCORE_EXC_MAP) == 0:
+            HTTPCORE_EXC_MAP = _load_httpcore_exceptions()
+        try:
+>           yield
+
+.venv\Lib\site-packages\httpx2\_transports\default.py:95: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+.venv\Lib\site-packages\httpx2\_transports\default.py:242: in handle_request
+    resp = self._pool.handle_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpcore2\_sync\connection_pool.py:243: in handle_request
+    raise exc from None
+.venv\Lib\site-packages\httpcore2\_sync\connection_pool.py:225: in handle_request
+    response = connection.handle_request(pool_request.request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpcore2\_sync\connection.py:98: in handle_request
+    return self._connection.handle_request(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpcore2\_sync\http11.py:125: in handle_request
+    raise exc
+.venv\Lib\site-packages\httpcore2\_sync\http11.py:97: in handle_request
+    ) = self._receive_response_headers(**kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpcore2\_sync\http11.py:167: in _receive_response_headers
+    event = self._receive_event(timeout=timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpcore2\_sync\http11.py:200: in _receive_event
+    data = self._network_stream.read(self.READ_NUM_BYTES, timeout=timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpcore2\_backends\sync.py:126: in read
+    with map_exceptions(exc_map):
+         ^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Vamsi\AppData\Local\Programs\Python\Python312\Lib\contextlib.py:158: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+map = {<class 'TimeoutError'>: <class 'httpcore2.ReadTimeout'>, <class 'OSError'>: <class 'httpcore2.ReadError'>}
+
+    @contextlib.contextmanager
+    def map_exceptions(map: ExceptionMapping) -> Generator[None]:
+        try:
+            yield
+        except Exception as exc:
+            for from_exc, to_exc in map.items():
+                if isinstance(exc, from_exc):
+>                   raise to_exc(exc) from exc
+E                   httpcore2.ReadTimeout: timed out
+
+.venv\Lib\site-packages\httpcore2\_exceptions.py:16: ReadTimeout
+
+The above exception was the direct cause of the following exception:
+
+db = {'posting': Engine(postgresql+psycopg://test_posting_app:***@127.0.0.1:5432/test_posting?connect_timeout=10), 'relay':..._timeout=10), 'ledger': Engine(postgresql+psycopg://test_ledger_app:***@127.0.0.1:5432/test_ledger?connect_timeout=10)}
+ledger = ('http://127.0.0.1:55897', 'pNMS7moQIBLOtE95URp4IqNq')
+kafka = '127.0.0.1:9092'
+registry = <confluent_kafka.schema_registry._sync.schema_registry_client.SchemaRegistryClient object at 0x0000018815E56630>
+scratch = {'input': 'test.in.5a7ccecb00', 'output': 'test.out.5a7ccecb00', 'dlq': 'test.dlq.5a7ccecb00'}
+
+    def test_a_long_ledger_outage_never_dead_letters_a_good_event(db, ledger, kafka, registry, scratch):
+        rec = stay("GR-00001", 1)
+>       checkout_producer(kafka, registry, scratch["input"]).send(rec)
+
+tests\test_parking_kafka.py:241: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+app\pipeline\producer.py:173: in send
+    value = self._serialize(record, SerializationContext(self.topic, MessageField.VALUE))
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\avro.py:399: in __call__
+    return self.__serialize(obj, ctx)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\avro.py:405: in __serialize
+    return self.__serialize_impl(obj, ctx)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\avro.py:437: in __serialize_impl
+    self._subject_name_func(ctx, self._schema_name, self._registry, self._subject_name_conf)
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\serde.py:286: in __call__
+    result = self._load_subject_name(topic, is_key, record_name, ctx, schema_registry_client, conf)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\serde.py:190: in _load_subject_name
+    associations = schema_registry_client.get_associations_by_resource_name(
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\schema_registry_client.py:1659: in get_associations_by_resource_name
+    response = self._rest_client.get(
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\schema_registry_client.py:467: in get
+    return self.send_request(url, method='GET', query=query)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\schema_registry_client.py:537: in send_request
+    raise e
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\schema_registry_client.py:525: in send_request
+    response = self.send_http_request(base_url, url, method, headers, body_str, query)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\schema_registry_client.py:594: in send_http_request
+    response = self.session.request(
+.venv\Lib\site-packages\httpx2\_client.py:791: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpx2\_client.py:974: in send
+    response = self._send_handling_auth(
+.venv\Lib\site-packages\httpx2\_client.py:1002: in _send_handling_auth
+    response = self._send_handling_redirects(
+.venv\Lib\site-packages\httpx2\_client.py:1037: in _send_handling_redirects
+    response = self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpx2\_client.py:1070: in _send_single_request
+    response = transport.handle_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpx2\_transports\default.py:241: in handle_request
+    with map_httpcore_exceptions():
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Vamsi\AppData\Local\Programs\Python\Python312\Lib\contextlib.py:158: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    @contextlib.contextmanager
+    def map_httpcore_exceptions() -> Generator[None]:
+        global HTTPCORE_EXC_MAP
+        if len(HTTPCORE_EXC_MAP) == 0:
+            HTTPCORE_EXC_MAP = _load_httpcore_exceptions()
+        try:
+            yield
+        except Exception as exc:
+            mapped_exc = None
+    
+            for from_exc, to_exc in HTTPCORE_EXC_MAP.items():
+                if not isinstance(exc, from_exc):
+                    continue
+                # We want to map to the most specific exception we can find.
+                # Eg if `exc` is an `httpcore2.ReadTimeout`, we want to map to
+                # `httpx2.ReadTimeout`, not just `httpx2.TimeoutException`.
+                if mapped_exc is None or issubclass(to_exc, mapped_exc):
+                    mapped_exc = to_exc
+    
+            if mapped_exc is None:  # pragma: no cover
+                raise
+    
+            message = str(exc)
+>           raise mapped_exc(message) from exc
+E           httpx2.ReadTimeout: timed out
+
+.venv\Lib\site-packages\httpx2\_transports\default.py:112: ReadTimeout
+_ test_eight_concurrent_resends_under_new_event_ids_give_one_credit_and_one_posting _
+
+db = {'posting': Engine(postgresql+psycopg://test_posting_app:***@127.0.0.1:5432/test_posting?connect_timeout=10), 'relay':..._timeout=10), 'ledger': Engine(postgresql+psycopg://test_ledger_app:***@127.0.0.1:5432/test_ledger?connect_timeout=10)}
+ledger = ('http://127.0.0.1:65071', 'E2fyOQO1oo2zuAVPZKyV_9_1')
+kafka = '127.0.0.1:9092'
+registry = <confluent_kafka.schema_registry._sync.schema_registry_client.SchemaRegistryClient object at 0x0000018815E56630>
+scratch = {'input': 'test.in.b0aea30ddf', 'output': 'test.out.b0aea30ddf', 'dlq': 'test.dlq.b0aea30ddf'}
+
+    def test_eight_concurrent_resends_under_new_event_ids_give_one_credit_and_one_posting(
+        db, ledger, kafka, registry, scratch
+    ):
+        """Change 1 (2026-11-23): the ledger key is the stay, so a re-emitted stay can't be credited twice in a race."""
+        base = stay("GR-00001", 1)
+        copies = [{**base, "event_id": str(uuid.uuid4())} for _ in range(8)]
+        producer = checkout_producer(kafka, registry, scratch["input"])
+        for rec in copies:
+            producer.send(rec)
+        messages = read_raw(kafka, scratch["input"], at_least=8)
+        service = service_for(db, ledger, kafka, registry, scratch)
+>       outcomes, errors = concurrent_copies(service, [as_incoming(m) for m in messages])
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_posting_kafka.py:190: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\test_posting_kafka.py:145: in concurrent_copies
+    barrier = threading.Barrier(len(messages))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <[AttributeError("'Barrier' object has no attribute '_state'") raised in repr()] Barrier object at 0x18816b4ade0>
+parties = 0, action = None, timeout = None
+
+    def __init__(self, parties, action=None, timeout=None):
+        """Create a barrier, initialised to 'parties' threads.
+    
+        'action' is a callable which, when supplied, will be called by one of
+        the threads after they have all entered the barrier and just prior to
+        releasing them all. If a 'timeout' is provided, it is used as the
+        default for all subsequent 'wait()' calls.
+    
+        """
+        if parties < 1:
+>           raise ValueError("parties must be >= 1")
+E           ValueError: parties must be >= 1
+
+C:\Users\Vamsi\AppData\Local\Programs\Python\Python312\Lib\threading.py:689: ValueError
+_____ test_an_undecodable_event_is_dead_lettered_and_the_next_event_flows _____
+
+    @contextlib.contextmanager
+    def map_httpcore_exceptions() -> Generator[None]:
+        global HTTPCORE_EXC_MAP
+        if len(HTTPCORE_EXC_MAP) == 0:
+            HTTPCORE_EXC_MAP = _load_httpcore_exceptions()
+        try:
+>           yield
+
+.venv\Lib\site-packages\httpx2\_transports\default.py:95: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+.venv\Lib\site-packages\httpx2\_transports\default.py:242: in handle_request
+    resp = self._pool.handle_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpcore2\_sync\connection_pool.py:243: in handle_request
+    raise exc from None
+.venv\Lib\site-packages\httpcore2\_sync\connection_pool.py:225: in handle_request
+    response = connection.handle_request(pool_request.request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpcore2\_sync\connection.py:98: in handle_request
+    return self._connection.handle_request(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpcore2\_sync\http11.py:125: in handle_request
+    raise exc
+.venv\Lib\site-packages\httpcore2\_sync\http11.py:97: in handle_request
+    ) = self._receive_response_headers(**kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpcore2\_sync\http11.py:167: in _receive_response_headers
+    event = self._receive_event(timeout=timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpcore2\_sync\http11.py:200: in _receive_event
+    data = self._network_stream.read(self.READ_NUM_BYTES, timeout=timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpcore2\_backends\sync.py:126: in read
+    with map_exceptions(exc_map):
+         ^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Vamsi\AppData\Local\Programs\Python\Python312\Lib\contextlib.py:158: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+map = {<class 'TimeoutError'>: <class 'httpcore2.ReadTimeout'>, <class 'OSError'>: <class 'httpcore2.ReadError'>}
+
+    @contextlib.contextmanager
+    def map_exceptions(map: ExceptionMapping) -> Generator[None]:
+        try:
+            yield
+        except Exception as exc:
+            for from_exc, to_exc in map.items():
+                if isinstance(exc, from_exc):
+>                   raise to_exc(exc) from exc
+E                   httpcore2.ReadTimeout: timed out
+
+.venv\Lib\site-packages\httpcore2\_exceptions.py:16: ReadTimeout
+
+The above exception was the direct cause of the following exception:
+
+db = {'posting': Engine(postgresql+psycopg://test_posting_app:***@127.0.0.1:5432/test_posting?connect_timeout=10), 'relay':..._timeout=10), 'ledger': Engine(postgresql+psycopg://test_ledger_app:***@127.0.0.1:5432/test_ledger?connect_timeout=10)}
+ledger = ('http://127.0.0.1:54531', 'DNmBAV1iza7zFMqXdaWtXQas')
+kafka = '127.0.0.1:9092'
+registry = <confluent_kafka.schema_registry._sync.schema_registry_client.SchemaRegistryClient object at 0x0000018815E56630>
+scratch = {'input': 'test.in.6deac98c3b', 'output': 'test.out.6deac98c3b', 'dlq': 'test.dlq.6deac98c3b'}
+
+    def test_an_undecodable_event_is_dead_lettered_and_the_next_event_flows(db, ledger, kafka, registry, scratch):
+        raw = raw_producer(kafka)
+        raw.produce(scratch["input"], key=b"GR-00009", value=b"\x00not-avro", headers=[("event_id", b"bad-1")])
+        raw.flush(10)
+        good = stay("GR-00002", 2)
+>       checkout_producer(kafka, registry, scratch["input"]).send(good)
+
+tests\test_posting_kafka.py:206: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+app\pipeline\producer.py:173: in send
+    value = self._serialize(record, SerializationContext(self.topic, MessageField.VALUE))
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\avro.py:399: in __call__
+    return self.__serialize(obj, ctx)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\avro.py:405: in __serialize
+    return self.__serialize_impl(obj, ctx)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\avro.py:457: in __serialize_impl
+    registered_schema = self._registry.register_schema_full_response(
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\schema_registry_client.py:786: in register_schema_full_response
+    response = self._rest_client.post(
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\schema_registry_client.py:470: in post
+    return self.send_request(url, method='POST', body=body)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\schema_registry_client.py:537: in send_request
+    raise e
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\schema_registry_client.py:525: in send_request
+    response = self.send_http_request(base_url, url, method, headers, body_str, query)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\confluent_kafka\schema_registry\_sync\schema_registry_client.py:594: in send_http_request
+    response = self.session.request(
+.venv\Lib\site-packages\httpx2\_client.py:791: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpx2\_client.py:974: in send
+    response = self._send_handling_auth(
+.venv\Lib\site-packages\httpx2\_client.py:1002: in _send_handling_auth
+    response = self._send_handling_redirects(
+.venv\Lib\site-packages\httpx2\_client.py:1037: in _send_handling_redirects
+    response = self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpx2\_client.py:1070: in _send_single_request
+    response = transport.handle_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpx2\_transports\default.py:241: in handle_request
+    with map_httpcore_exceptions():
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Vamsi\AppData\Local\Programs\Python\Python312\Lib\contextlib.py:158: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    @contextlib.contextmanager
+    def map_httpcore_exceptions() -> Generator[None]:
+        global HTTPCORE_EXC_MAP
+        if len(HTTPCORE_EXC_MAP) == 0:
+            HTTPCORE_EXC_MAP = _load_httpcore_exceptions()
+        try:
+            yield
+        except Exception as exc:
+            mapped_exc = None
+    
+            for from_exc, to_exc in HTTPCORE_EXC_MAP.items():
+                if not isinstance(exc, from_exc):
+                    continue
+                # We want to map to the most specific exception we can find.
+                # Eg if `exc` is an `httpcore2.ReadTimeout`, we want to map to
+                # `httpx2.ReadTimeout`, not just `httpx2.TimeoutException`.
+                if mapped_exc is None or issubclass(to_exc, mapped_exc):
+                    mapped_exc = to_exc
+    
+            if mapped_exc is None:  # pragma: no cover
+                raise
+    
+            message = str(exc)
+>           raise mapped_exc(message) from exc
+E           httpx2.ReadTimeout: timed out
+
+.venv\Lib\site-packages\httpx2\_transports\default.py:112: ReadTimeout
+_____________ test_an_event_flows_through_the_running_containers ______________
+
+kafka = '127.0.0.1:9092'
+registry = <confluent_kafka.schema_registry._sync.schema_registry_client.SchemaRegistryClient object at 0x0000018815E56630>
+
+    def test_an_event_flows_through_the_running_containers(kafka, registry):
+        raw, password = os.environ.get("TEST_DATABASE_URL"), os.environ.get("TEST_POSTING_DB_PASSWORD")
+        if not (raw and password):
+            pytest.skip("TEST_DATABASE_URL or TEST_POSTING_DB_PASSWORD not set: run scripts\\test_integration.ps1")
+        admin = make_url(raw)
+        engine = create_engine(
+            runtime_url(Database("posting"), password, host=admin.host or "localhost", port=admin.port or 5432)
+        )
+        # A stay the stack hasn't posted before: earlier smoke runs stay in its database, and reusing a stay ID would be
+        # (correctly) refused as a duplicate.
+        with engine.connect() as conn:
+            used = set(conn.execute(select(posting.c.stay_id).where(posting.c.stay_id.like("ML-%"))).scalars())
+        free = [f"ML-{n:04d}" for n in range(1000, 10000) if f"ML-{n:04d}" not in used]
+        assert free, "no unused smoke-test stay ID left: reset the stack's data with scripts\\stack.ps1 reset"
+        stay_id = random.choice(free)
+        record = build_event(
+            member_number="GR-09998", stay_id=stay_id, check_in=date(2026, 11, 20), nights=1, room_rate_cents=12_345
+        )
+        sent = checkout_producer(kafka, registry, topics.CHECKED_OUT).send(record)
+        try:
+            status, deadline = None, time.monotonic() + 90
+            while time.monotonic() < deadline:
+                with engine.connect() as conn:
+                    posted = conn.execute(
+                        select(posting.c.ledger_entry_id).where(posting.c.event_id == sent.event_id)
+                    ).first()
+                    status = conn.execute(
+                        select(outbox.c.status).where(outbox.c.payload["source_event_id"].astext == sent.event_id)
+                    ).scalar()
+                if posted and status == "published":
+                    break
+                time.sleep(0.5)
+            assert posted is not None, "the posting container didn't post the event"
+>           assert status == "published", f"the relay container didn't publish it (outbox status {status})"
+E           AssertionError: the relay container didn't publish it (outbox status pending)
+E           assert 'pending' == 'published'
+E             
+E             - published
+E             + pending
+
+tests\test_posting_smoke.py:62: AssertionError
+__________ test_the_running_relay_publishes_a_row_and_serves_metrics __________
+
+    def test_the_running_relay_publishes_a_row_and_serves_metrics():
+        raw, password, metrics_url = (
+            os.environ.get("TEST_DATABASE_URL"),
+            os.environ.get("TEST_POSTING_DB_PASSWORD"),
+            os.environ.get("TEST_RELAY_METRICS_URL"),
+        )
+        if not (raw and password and metrics_url):
+            pytest.skip(
+                "TEST_DATABASE_URL, TEST_POSTING_DB_PASSWORD or TEST_RELAY_METRICS_URL not set: run scripts\\stack.ps1 up, "
+                "then scripts\\test_integration.ps1"
+            )
+        admin = make_url(raw)
+        engine = create_engine(
+            runtime_url(Database("posting"), password, host=admin.host or "localhost", port=admin.port or 5432)
+        )
+        record = payload("GR-09999", 9999) | {"correlation_id": f"smoke-{uuid.uuid4()}"}
+        try:
+            with engine.begin() as conn:
+                row_id = conn.execute(
+                    insert(outbox)
+                    .values(
+                        topic=topics.POINTS_POSTED,
+                        message_key="GR-09999",
+                        payload=record,
+                        headers={"correlation_id": record["correlation_id"], "schema_version": "1", "smoke": "true"},
+                        trace_context={"traceparent": trace.new_traceparent()},
+                    )
+                    .returning(outbox.c.id)
+                ).scalar_one()
+            deadline = time.monotonic() + 60
+            status = None
+            while time.monotonic() < deadline:
+                with engine.connect() as conn:
+                    status = conn.execute(select(outbox.c.status).where(outbox.c.id == row_id)).scalar_one()
+                if status == "published":
+                    break
+                time.sleep(0.5)
+>           assert status == "published", f"the relay container didn't publish the row (status {status})"
+E           AssertionError: the relay container didn't publish the row (status pending)
+E           assert 'pending' == 'published'
+E             
+E             - published
+E             + pending
+
+tests\test_relay_smoke.py:65: AssertionError
+7 failed, 58 passed, 310 deselected in 4213.39s (1:10:13)

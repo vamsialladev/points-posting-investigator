@@ -70,7 +70,8 @@ three.
     connections just as the broker replies, so batches the broker already wrote are sent again.
   - (c) also has a **control**: without idempotence, the same fault produced **37 duplicates**, so the "0 duplicates"
     in (c) is idempotence at work.
-- **The two-workers test** was rerun 10 times on the fixed code (verification log).
+- **The two-workers test** is rerun 10 times on the fixed code in the final repeat batch, on a quiet machine. Its
+  result goes in the verification log; until then, this fix is proven by the producer tests, not by that rerun.
 
 ## What went well, and what didn't
 - **Went well:** the anomaly was treated as a possible correctness bug, not a flaky test, and found from data. The

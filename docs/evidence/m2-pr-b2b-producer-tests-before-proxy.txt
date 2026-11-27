@@ -1,0 +1,66 @@
+﻿uv : %4|1795737692.124|CONFWARN|rdkafka#producer-1| [thrd:app]: Configuration property enable.gapless.guarantee is 
+experimental: When set to `true`, any error that could result in a gap in the produced message series when a batch of 
+messages fails, will raise a fatal error (ERR__GAPLESS_GUARANTEE) and stop the producer. Messages failing due to 
+`message.timeout.ms` are not covered by this guarantee. Requires `enable.idempotence=true`.
+At line:1 char:438
++ ... afka7.txt"; uv run python scripts\run_integration.py -k test_producer ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (%4|1795737692.1...mpotence=true`.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+%4|1795737693.937|CONFWARN|rdkafka#producer-2| [thrd:app]: Configuration property enable.gapless.guarantee is 
+experimental: When set to `true`, any error that could result in a gap in the produced message series when a batch of 
+messages fails, will raise a fatal error (ERR__GAPLESS_GUARANTEE) and stop the producer. Messages failing due to 
+`message.timeout.ms` are not covered by this guarantee. Requires `enable.idempotence=true`.
+%3|1795737695.981|FAIL|rdkafka#producer-2| [thrd:127.0.0.1:9/bootstrap]: 127.0.0.1:9/bootstrap: Connect to 
+ipv4#127.0.0.1:9 failed: Unknown error (after 2044ms in state CONNECT)
+%4|1795737697.210|CONFWARN|rdkafka#producer-4| [thrd:app]: Configuration property enable.gapless.guarantee is 
+experimental: When set to `true`, any error that could result in a gap in the produced message series when a batch of 
+messages fails, will raise a fatal error (ERR__GAPLESS_GUARANTEE) and stop the producer. Messages failing due to 
+`message.timeout.ms` are not covered by this guarantee. Requires `enable.idempotence=true`.
+%4|1795737697.885|FAIL|rdkafka#producer-4| [thrd:127.0.0.1:19092/1]: 127.0.0.1:19092/1: Disconnected: connection 
+closed by peer: POLLHUP (after 494ms in state UP)
+%6|1795737699.251|FAIL|rdkafka#producer-4| [thrd:127.0.0.1:19092/1]: 127.0.0.1:19092/1: Disconnected: connection 
+closed by peer: POLLHUP (after 1238ms in state UP)
+%4|1795737703.160|CONFWARN|rdkafka#producer-7| [thrd:app]: Configuration property enable.gapless.guarantee is 
+experimental: When set to `true`, any error that could result in a gap in the produced message series when a batch of 
+messages fails, will raise a fatal error (ERR__GAPLESS_GUARANTEE) and stop the producer. Messages failing due to 
+`message.timeout.ms` are not covered by this guarantee. Requires `enable.idempotence=true`.
+%4|1795737703.368|FAIL|rdkafka#producer-7| [thrd:127.0.0.1:19092/1]: 127.0.0.1:19092/1: Disconnected: connection 
+closed by peer: POLLHUP (after 78ms in state UP)
+%6|1795737705.217|FAIL|rdkafka#producer-7| [thrd:127.0.0.1:19092/1]: 127.0.0.1:19092/1: Disconnected: connection 
+closed by peer: POLLHUP (after 1564ms in state UP)
+..FF
+================================== FAILURES ===================================
+______ test_producer_retries_add_no_duplicates_and_keep_per_member_order ______
+
+kafka = '127.0.0.1:9092'
+registry = <confluent_kafka.schema_registry._sync.schema_registry_client.SchemaRegistryClient object at 0x0000020ACCC2CF50>
+scratch = {'input': 'test.in.b1be4d1621', 'output': 'test.out.b1be4d1621', 'dlq': 'test.dlq.b1be4d1621'}
+
+    def test_producer_retries_add_no_duplicates_and_keep_per_member_order(kafka, registry, scratch):
+        """ADR-0017: idempotence must drop the batches the producer sent twice. The test fails if no request timed out or
+        was retried (rule 7: a run that exercised nothing must not pass)."""
+        retried, records = faulted_batch(registry, scratch["input"], idempotent=True)
+>       assert retried > 0, "no request timed out or was retried, so this run tested nothing"
+E       AssertionError: no request timed out or was retried, so this run tested nothing
+E       assert 0 > 0
+
+tests\test_producer_kafka.py:118: AssertionError
+___________ test_without_idempotence_the_same_fault_does_duplicate ____________
+
+kafka = '127.0.0.1:9092'
+registry = <confluent_kafka.schema_registry._sync.schema_registry_client.SchemaRegistryClient object at 0x0000020ACCC2CF50>
+scratch = {'input': 'test.in.05f4093654', 'output': 'test.out.05f4093654', 'dlq': 'test.dlq.05f4093654'}
+
+    def test_without_idempotence_the_same_fault_does_duplicate(kafka, registry, scratch):
+        """The control for the test above: it shows the fault really makes the broker write a batch twice, so "0
+        duplicates" there is idempotence at work and not a fault that never happened."""
+        retried, records = faulted_batch(registry, scratch["output"], idempotent=False)
+>       assert retried > 0, "no request timed out or was retried, so this run tested nothing"
+E       AssertionError: no request timed out or was retried, so this run tested nothing
+E       assert 0 > 0
+
+tests\test_producer_kafka.py:135: AssertionError
+2 failed, 2 passed, 361 deselected in 18.73s
+stack settings: 6/6 set
