@@ -28,6 +28,21 @@ class RuntimeRole:
     suffix: str  # the role is <prefix><database>_<suffix>
     password_variable: str  # where the password comes from (.env, CI's masked value); never printed
     grants: dict[str, str]  # "KIND name" -> privileges; anything not listed is refused
+    read_only: bool = False  # every transaction of this role starts read-only (a second guard behind the grants)
+
+
+INVESTIGATOR = "investigator"
+# RFC-0002: the investigator and the rules baseline read stored evidence through these roles. SELECT only, on
+# every database; never the raw bytes of a parked event (`raw_key`, `raw_value`), which they have no use for.
+_PARKED_READABLE = (
+    "id, event_id, member_number, stay_id, revision, raw_headers, source_topic, source_partition, source_offset,"
+    " status, attempts, transient_failures, next_attempt_at, claimed_by, lease_until, error_class, last_error,"
+    " first_failed_at, last_failed_at, parked_at, done_at, dead_at"
+)
+
+
+def _reader(grants: dict[str, str]) -> RuntimeRole:
+    return RuntimeRole(INVESTIGATOR, "INVESTIGATOR_DB_PASSWORD", grants, read_only=True)
 
 
 # tests/test_ledger_postgres.py and tests/test_relay_postgres.py check each grant against the real database, both
@@ -39,6 +54,8 @@ RUNTIME_ROLES: dict[str, tuple[RuntimeRole, ...]] = {
             "LEDGER_DB_PASSWORD",
             {"TABLE credits": "SELECT, INSERT", "SEQUENCE credit_entry_seq": "USAGE"},
         ),
+        # The investigator reads the ledger's table, never its API: it holds no token that could credit.
+        _reader({"TABLE credits": "SELECT"}),
     ),
     "posting": (
         RuntimeRole(
@@ -64,6 +81,14 @@ RUNTIME_ROLES: dict[str, tuple[RuntimeRole, ...]] = {
                 " lease_until, published_at, dead_at)"
             },
         ),
+        _reader(
+            {
+                "TABLE posting": "SELECT",
+                "TABLE outbox": "SELECT",
+                "TABLE parked_event": f"SELECT ({_PARKED_READABLE})",
+                "TABLE skipped_event": "SELECT",
+            }
+        ),
     ),
     # RFC-0002, ADR-0019: stored evidence. The services may only add log lines and alert evaluations. They can't
     # read them back, change them or delete them, and can't touch the change feed, questions or runbooks.
@@ -77,6 +102,15 @@ RUNTIME_ROLES: dict[str, tuple[RuntimeRole, ...]] = {
                 "TABLE alert_evaluation": "INSERT",
                 "SEQUENCE alert_evaluation_id_seq": "USAGE",
             },
+        ),
+        _reader(
+            {
+                "TABLE log_event": "SELECT",
+                "TABLE change_event": "SELECT",
+                "TABLE member_question": "SELECT",
+                "TABLE alert_evaluation": "SELECT",
+                "TABLE runbook_section": "SELECT",
+            }
         ),
     ),
 }

@@ -122,7 +122,9 @@ Kept current at every milestone. Each line says what is limited, why, and what w
 - **The ledger `members` table moves to v2** (ADR-0019): no pre-registered scenario needs an unknown member.
 - **The 18 scenarios have run on GitHub's runners, not on the owner's machine.** Six run in the required CI job and
   twelve in the "Scenario batch" workflow. A slower or busier machine can behave differently (verification log M3
-  #7 shows one such case), so a local run is still worth doing when the laptop is free.
+  #7 shows one such case). The owner decided on 2026-11-28 that GitHub Actions is the source of truth for
+  scenario runs and that no local batch will be run; so nothing here says how the scenarios behave on Windows
+  with Docker Desktop.
 - **Kafka logins travel without TLS** (SASL/PLAIN on loopback and the compose network). Local stack only
   (ADR-0021).
 - **The controller listener has no login,** and its anonymous principal is a super user. It isn't published to the

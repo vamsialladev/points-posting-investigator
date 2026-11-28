@@ -150,6 +150,7 @@ services:
       POSTING_DB_PASSWORD: ${POSTING_DB_PASSWORD:?set POSTING_DB_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
       RELAY_DB_PASSWORD: ${RELAY_DB_PASSWORD:?set RELAY_DB_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
       OPS_DB_PASSWORD: ${OPS_DB_PASSWORD:?set OPS_DB_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
+      INVESTIGATOR_DB_PASSWORD: ${INVESTIGATOR_DB_PASSWORD:?set INVESTIGATOR_DB_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
     depends_on:
       db:
         condition: service_healthy

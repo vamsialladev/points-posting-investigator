@@ -12,21 +12,34 @@ from __future__ import annotations
 
 import pytest
 
+from app.evidence.model import Snapshot
+from app.pipeline import topics
 from app.scenarios import plans, run, steps
 from app.scenarios.executor import Executor
-from tests.scenario_helpers import credits_for, free_run, rows
+from tests.scenario_helpers import capture, credits_for, free_run, rows, started
 
 pytestmark = [pytest.mark.postgres, pytest.mark.kafka]
+READERS: dict[str, object] = {}
+SNAPSHOTS: dict[str, Snapshot] = {}  # the evidence read after each trigger, as the read-only logins
+
+
+@pytest.fixture(autouse=True)
+def _read_only_logins(evidence_readers):
+    READERS["stack"] = evidence_readers
 
 
 def trigger_then_reset(effects, scenario: str, tmp_path) -> plans.Plan:
+    """Trigger, take a read-only evidence snapshot (kept for the workflow to upload), then reset."""
     built = plans.plan(scenario, free_run(effects, scenario))
     number = built.manifest.run
     said: list[str] = []
+    since = started()
     for phase in ("trigger", "reset"):
         ok = run.execute(phase, scenario, number, None, effects, directory=tmp_path, say=said.append,
                          executor=Executor(effects, poll_seconds=0.5))  # fmt: skip
         assert ok, "\n".join(said)
+        if phase == "trigger":
+            SNAPSHOTS[scenario] = capture(READERS["stack"], f"{scenario}-run{number}", since)
     return built
 
 
@@ -69,6 +82,16 @@ def test_s05_the_poison_event_is_dead_after_five_attempts_and_the_event_behind_i
     behind = next(e for e in others if e.member_number == poison.member_number)
     assert rows(effects, "posting", "SELECT 1 FROM posting WHERE event_id = %s", (behind.event_id,)) == [(1,)]
     assert [(a.member_number, a.effect) for a in built.manifest.affected] == [(poison.member_number, steps.NOT_POSTED)]
+    # The same facts, as the read-only logins see them: this is what the rules and the investigator will cite.
+    snapshot = SNAPSHOTS["S05"]
+    dead = [i for i in snapshot.of("dead_letter") if i.data.get("event_id") == poison.event_id]
+    assert len(dead) == 1 and dead[0].data["error_class"] == "ledger_rejected_422" and dead[0].data["attempt"] == "5"
+    assert dead[0].data["key"] == poison.member_number
+    parked_seen = [i for i in snapshot.of("parked") if i.data["event_id"] == poison.event_id]
+    assert [(i.data["status"], i.data["attempts"]) for i in parked_seen] == [("dead", 5)]
+    assert {i.data["stay_id"] for i in snapshot.of("credit")} >= {e.stay_id for e in others}
+    assert poison.stay_id not in {i.data["stay_id"] for i in snapshot.of("credit")}
+    assert snapshot.truncated == () and len(snapshot.ids()) == len(snapshot.items)
 
 
 def test_s11_the_correction_is_dead_lettered_as_original_missing_and_the_original_posts(effects, tmp_path):
@@ -92,6 +115,33 @@ def test_s13_skewed_events_post_normally(effects, tmp_path):
     assert len(rows(effects, "posting", "SELECT 1 FROM posting WHERE event_id = ANY(%s)", (ids,))) == len(ids)
     assert rows(effects, "posting", "SELECT 1 FROM parked_event WHERE event_id = ANY(%s)", (ids,)) == []
     assert all(e.clock_offset_seconds == plans.SKEW_SECONDS for e in built.manifest.events)
+
+
+def test_s13_the_skew_shows_on_the_topic_and_only_there(effects, tmp_path):
+    """The catalog's S13 evidence: an event's own `occurred_at` is hours ahead of the broker's timestamp for the same
+    offset. Read as the `investigator` Kafka login. Events of other scenarios are the control: theirs agree."""
+    _store, reader = READERS["stack"]
+    skewed_ids = {e.event_id for number in range(plans.MAX_RUN + 1) for e in plans.plan("S13", number).manifest.events}
+    found, _older_left_out = reader.messages(topics.CHECKED_OUT)
+    decoded = [item for item in found if item.data.get("decoded")]
+    skewed = [item for item in decoded if item.data["event_id"] in skewed_ids]
+    control = [item for item in decoded if item.data["event_id"] not in skewed_ids]
+    assert len(skewed) >= 8, "S13's events are on the topic (test_s13_skewed_events_post_normally ran before this)"
+    assert len(control) >= 10, "and so are other scenarios' events, to compare with"
+    for item in skewed:
+        gap = item.data["occurred_minus_broker_seconds"]
+        assert abs(gap - plans.SKEW_SECONDS) < 120, f"{item.id}: {gap} s"
+        assert item.data["occurred_at"] > item.at, "the event claims to have happened after the broker received it"
+    for item in control:
+        assert abs(item.data["occurred_minus_broker_seconds"]) < 120, f"{item.id} is not skewed"
+    # The stored rows show nothing: a posting row for a skewed event looks like any other.
+    snapshot = SNAPSHOTS["S13"]
+    posted = [i for i in snapshot.of("posting") if i.id.removeprefix("posting:") in skewed_ids]
+    assert len(posted) >= 8 and all("occurred_at" not in i.data for i in posted)
+    # None of S13's events was parked or dead-lettered. The window starts just before the trigger on a shared stack,
+    # so it can hold the scenario before it (S11's dead letter lands seconds earlier): judge S13's own events only.
+    aside = [i for i in (*snapshot.of("parked"), *snapshot.of("dead_letter")) if i.data.get("event_id") in skewed_ids]
+    assert aside == []
 
 
 def test_s16_leaves_a_question_and_nothing_else(effects, tmp_path):

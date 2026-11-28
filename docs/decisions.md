@@ -676,3 +676,51 @@ this decision. Updates are added as dated bullets; nothing is rewritten.
   log, M3 Phase 2.
 - **What would change this decision:** a hosted deployment (then TLS and per-broker credentials), or needing to
   rotate a login without a broker restart (then SCRAM).
+
+## ADR-0022: One read-only evidence layer, with the guarantee in Postgres and the broker, not in the reader's code
+- **Context:** RFC-0002 Phase 3. The rules baseline and the investigator must judge the same evidence, and the
+  investigator must never be able to write. ADR-0021 put that guarantee in the broker for Kafka. The databases
+  still had no reader role: any read would have used a role that can also write.
+- **Options considered:**
+  - **Who reads:**
+    1. Each arm has its own queries.
+    2. One layer (`app/evidence/`) that both arms use, outside `app/arms/` and `app/investigator/`, so building it
+       does not freeze the pre-registration.
+  - **Where "read-only" lives:**
+    1. In the layer's code (it only issues SELECTs).
+    2. In Postgres: a role per database with SELECT grants only, and read-only transactions by default.
+  - **Raw payload bytes of a parked event:**
+    1. Readable.
+    2. A view without them.
+    3. Column-level SELECT on the table, leaving out `raw_key` and `raw_value`.
+  - **What a read returns:**
+    1. Rows.
+    2. Evidence items with a stable ID (`kind:where`), a time, and clipped text fields.
+- **Decision:** option 2 for who reads, where it lives and what is returned; option 3 for the raw bytes.
+  - **Roles** (`app/db/roles.py`): `posting_investigator`, `ledger_investigator`, `ops_investigator`, one password
+    (`INVESTIGATOR_DB_PASSWORD`). SELECT only, on named tables. `ALTER ROLE … SET default_transaction_read_only = on`.
+    A session can switch that setting off for itself, so the grants are the guarantee and the setting is the second
+    lock; a test does exactly that and is still refused.
+  - **Fixed queries** (`app/evidence/store.py`): ten named reads, each one bounded SELECT with `:since` and
+    `:limit`. No caller passes SQL. A read says when it hit its limit, and a snapshot lists what was cut.
+  - **Topics** (`app/evidence/topics.py`): the `investigator` Kafka login, `assign` only (no group, no commit). An
+    event carries its own `occurred_at` next to the broker's timestamp, as `occurred_minus_broker_seconds`: the only
+    place S13's skew shows. An undecodable event says so; its bytes are never returned.
+  - **Text someone else wrote** (log messages, error text, correlation IDs, questions, runbook text) is listed in
+    `model.UNTRUSTED` and cut to 300 characters. It is a value, never an instruction.
+  - **Snapshots:** the scenario tests take one after every trigger, as these logins, and the workflows upload them.
+    The 18 dev snapshots are then committed as fixtures (the next PR), so the rules and the mock evaluation run
+    offline.
+- **Tradeoff:**
+  - **One password for three roles.** Simpler to hand to one process; a leak exposes all three read paths. They
+    are read-only and the data is synthetic.
+  - **Column-level grants mean `SELECT *` on `parked_event` fails** for the reader. Intended; a new column must be
+    added to the readable list on purpose.
+  - **A snapshot is a point in time.** The window is "since just before the trigger", so on a shared stack it can
+    hold another scenario's rows. The rules must work from what a real investigator would see, so this is kept.
+  - **Reading a topic from the start is bounded by a message limit,** so on a long-lived stack the oldest messages
+    are left out and reported as such.
+- **Result:** `tests/test_evidence_unit.py`, `tests/test_db_offline.py` (offline); `tests/test_evidence_postgres.py`,
+  `tests/test_scenarios_real.py` (real stack; S05 and S13 assert on the snapshot); verification log, M3 Phase 3.
+- **What would change this decision:** a hosted deployment (a password per role, from a secret manager), or
+  evidence volumes that need pagination instead of one bounded read.

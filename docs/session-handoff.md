@@ -1,15 +1,22 @@
 # Session handoff
 
-**Updated:** 2026-11-28 (UTC). **RFC-0002 Phase 1 is done and Phase 2 is done except Kafka SASL and ACLs.** All 18
-scenarios trigger and reset on a real stack in GitHub Actions (6 in the required CI job, 12 in the "Scenario batch"
-workflow), and Kafka asks every client for a login with a broker-enforced access list. Merged: PRs #11 to #17.
-Open: #18 (rebalance log lines, catalog corrections, and the S07 diagnosis below). Milestone 2
-is complete. The owner's "Milestone 3" (a read-only AI investigator plus human-approved replay) runs as the phases of
+**Updated:** 2026-11-28 (UTC). **RFC-0002 Phases 1 and 2 are done; Phase 3 is in progress.** All 18 scenarios
+trigger and reset on a real stack in GitHub Actions (6 in the required CI job, 12 in the "Scenario batch"
+workflow), and Kafka asks every client for a login with a broker-enforced access list. Merged: PRs #11 to #18.
+Milestone 2 is complete.
+
+**Owner's decision, 2026-11-28: no local scenario batch. GitHub Actions is the source of truth for scenario
+runs.** Don't start the local stack for scenarios; the laptop stays free for other stages.
+
+**Autopilot for Phase 3 (owner, 2026-11-28):** up to $3 of live API spend is pre-approved for this phase; merges
+on green. **Hard stops only:** exceeding the cap, anything newly public, deleting real data, changing real
+secrets, weakening a gate, or a result after the freeze that contradicts the plan. Collect decisions into one
+message at the end, each with a recommended answer; report in 5 lines. The owner's "Milestone 3" (a read-only AI investigator plus human-approved replay) runs as the phases of
 `docs/rfcs/RFC-0002-investigator-and-approved-replay.md` across spec M3, M6 and M7 (ADR-0019).
 
 ## Start of the next session
 1. Read `CLAUDE.md`, `docs/implementation-status.md`, this file, **RFC-0002** and `docs/failure-catalog.md`.
-2. Run `scripts\test.ps1`: it should give **575 passed, 91 skipped**, coverage 83.46% (after PR #14).
+2. Run `scripts\test.ps1`: it should give **607 passed, 140 skipped**, coverage 82.19% (branch `m3/evidence-layer`).
 3. Continue with the first phase below that isn't done. The plan is approved: no new approval is needed for a
    phase, only for what "Standing orders" lists.
 
@@ -49,8 +56,8 @@ Already approved:
 |---|---|---|
 | 0 | RFC-0002, ADR-0019 | done (`49dc098`) |
 | 1 | Pre-registration: catalog, hypotheses, thresholds, protocol, lock, order test | done (`4828940`), PR #11 |
-| 2 | Trigger and reset for all 18 scenarios (`python -m app.scenarios`); `log_event`, `change_event`, the lag reader, alert rules as YAML; Kafka SASL and ACLs | **in progress**: see "Phase 2, piece by piece" |
-| 3 | Minimal rules baseline (`app/arms/`) | not started. **The first commit here freezes the pre-registration** |
+| 2 | Trigger and reset for all 18 scenarios (`python -m app.scenarios`); `log_event`, `change_event`, the lag reader, alert rules as YAML; Kafka SASL and ACLs | done, PRs #13 to #18 |
+| 3 | Read-only evidence layer (`app/evidence/`, ADR-0022), per-scenario snapshots, then the minimal rules baseline (`app/arms/`) | **in progress**: evidence layer and snapshot capture on branch `m3/evidence-layer`; fixtures and rules not started. **The first commit under `app/arms/` freezes the pre-registration** |
 | 4 | Investigator (`app/investigator/`): tools, loop, citations, mock and hostile-mock providers, audit, GenAI spans | not started |
 | 5 | Proposal, approval bound to the message-set hash, replay through the idempotent path | not started |
 | 6 | Mock evaluation of the 18 dev scenarios, evidence, teaching notes | not started |
@@ -88,8 +95,13 @@ Already approved:
      offline in CI.
   3. Only then `app/arms/rules.py`: a pure function from a snapshot to ranked root-cause codes, cited facts, a
      recovery code with its message set, and affected members. Its first commit is the freeze.
-- **New database role passwords** will be needed (`INVESTIGATOR_DB_PASSWORD`): `new_env.ps1 -AddMissing` is
-  already approved.
+- **`INVESTIGATOR_DB_PASSWORD`** is in the owner's `.env` (added 2026-11-28 with `new_env.ps1 -AddMissing`;
+  preflight `core` is READY).
+- **State of the order of work (2026-11-28):** step 1 is built (ADR-0022). Step 2's capture is built: every
+  scenario test takes a snapshot after its trigger into `.scenario-runs/evidence/<scenario>-run<n>.json`, and the
+  required job (artifact `scenario-evidence-<run id>`) and the batch (artifact `scenario-batch-<run id>`) upload
+  them. Still to do: download both artifacts from a green run on `main`, commit the 18 as fixtures, then step 3.
+- **S13's skew is now tested from the topic** (`test_s13_the_skew_shows_on_the_topic_and_only_there`).
 
 ## Phase 2, piece by piece
 | Piece | State |

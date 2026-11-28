@@ -33,6 +33,7 @@ KAFKA_LOGINS = (
     "KAFKA_INVESTIGATOR_PASSWORD",
     "KAFKA_REPLAYER_PASSWORD",
 )  # app.pipeline.kafka_auth.PASSWORD_VARIABLES; tests/test_kafka_auth.py keeps the two equal
+READER_LOGIN = "INVESTIGATOR_DB_PASSWORD"
 
 
 def main(argv: list[str]) -> int:
@@ -58,6 +59,11 @@ def main(argv: list[str]) -> int:
             env[name] = value
             logins += 1
     print(f"kafka logins: {logins}/{len(KAFKA_LOGINS)} set")
+    # The read-only database login the scenario tests read evidence with (ADR-0022). Named, never printed.
+    reader = env.get(READER_LOGIN) or values.get(READER_LOGIN)
+    if reader:
+        env[READER_LOGIN] = reader
+    print(f"read-only database login: {'set' if reader else 'missing'}")
     env["REQUIRE_MARKERS"] = "postgres,kafka"
     # `--batch` runs only the slow scenario batch (tests/test_scenarios_batch.py); without it the batch is left out,
     # so the required CI job stays fast. Either way a skipped or missing postgres/kafka test is a failure.
