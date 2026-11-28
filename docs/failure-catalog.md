@@ -127,15 +127,20 @@ set differs from the entry's.
 ### S07: Database transaction failure in the posting service
 - **Trigger:** `trigger S07`. Takes away the posting role's right to log in and ends its sessions, for a fixed
   time, while events flow. The ledger's database stays up.
-- **Expected behaviour:** the ledger credits, then the posting transaction fails; the consumer seeks back and
-  retries, so the partition waits; after the reset the retry gets the same ledger entry and writes the rows.
+- **Expected behaviour:** the posting service reads its database before it calls the ledger, so most events fail
+  at that read and are never credited during the outage. The consumer seeks back and retries the same message, so
+  each partition waits. An event that was between its reads and its write when the login was cut has been
+  credited without a posting row: at most one per partition, and often none. After the reset every event posts,
+  and a credited one gets the same ledger entry back.
 - **Root cause:** `posting_db_unavailable`
-- **Evidence:** ledger credits with no posting row during the window, and a posting row for each after it; lag
-  rising on the waiting partitions; database errors in the stored logs; no parked events from this cause.
+- **Evidence:** events keep arriving on the topic while no posting row is written; lag rising on the waiting
+  partitions; stored log lines from the posting service saying it retries a message in place after
+  `DatabaseFailure`; no parked events from this cause (parking needs the database); no ledger errors. Sometimes,
+  not always: up to one ledger credit per partition with no posting row until the reset.
 - **Recovery:** `none`. The pipeline heals itself once the database is back.
 - **Affected members:** none lost; postings in the window are late.
 - **Reset:** `reset S07` (the role can log in again)
-- **Rules enough:** no. It needs the ledger rows and the posting rows compared.
+- **Rules enough:** no. Lag with no ledger errors and no parked events has to be tied to the retry lines.
 
 ### S08: Expired ledger credential (401)
 - **Trigger:** `trigger S08`. Sets the ledger token's expiry in the past, then sends events.
