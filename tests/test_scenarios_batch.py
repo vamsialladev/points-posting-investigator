@@ -68,7 +68,15 @@ def thread_dump(service: str) -> str:
     starts = [n for n, line in enumerate(lines) if line.startswith(("Thread 0x", "Current thread 0x"))]
     if not starts:
         return f"thread dump of {service}: no stack found in its last 200 log lines"
-    return f"thread dump of {service}:\n" + "\n".join("  " + line[:170] for line in lines[starts[0] :][:90])
+    # The service's own console lines just before the dump (its ledger request lines left out): what it logged,
+    # whether or not the log handler stored it.
+    before = [line for line in lines[: starts[0]] if "HTTP Request:" not in line and "rdkafka" not in line][-30:]
+    return (
+        f"console of {service} before the dump:\n"
+        + "\n".join("  " + line[:170] for line in before)
+        + f"\nthread dump of {service}:\n"
+        + "\n".join("  " + line[:170] for line in lines[starts[0] :][:60])
+    )
 
 
 def ids(events) -> list[str]:
