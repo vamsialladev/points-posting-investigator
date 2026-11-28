@@ -145,7 +145,10 @@ Kept current at every milestone. Each line says what is limited, why, and what w
   passes them; today's services mostly log plain messages. A redaction filter and trace IDs on every line are M4.
 - **A scenario's planted log line is written by the trigger, not by a service.** It is labelled as coming from the
   posting service because S17 tests text that looks like a real log line.
-- **Stored logs can be lost.** A full queue or a database failure drops lines (counted, not raised), by design.
+- **Stored logs can still be lost, but no longer silently.** A full queue drops lines; a write that fails 20
+  times in a row drops its batch. Each failed write is reported on the service's stderr. Until PR #18 a single
+  line written by itself was always lost (a one-row insert was refused for the insert-only role), so stored logs
+  from before that fix are incomplete: lines that arrived alone are missing.
 - **Runs are limited to 0 to 12 per scenario** (234 scenario runs), by the BR-/ML-#### stay ID shape.
 - **A 10/10 local repeat run didn't catch a timing race** that a faster CI runner hit (verification log M3 #7). The
   M2 repeat runs show stability on the owner's machine, not on every machine.

@@ -59,20 +59,20 @@ Already approved:
 **Before Phase 3's first commit,** any correction to a pre-registered file needs
 `uv run python scripts/prereg_lock.py --write` in the same commit. After it, those files don't change.
 
-## Open problem: S07's stored evidence (settle this before the freeze)
-- **What is known:** in batch run 46094551526 the posting service stored **no** "retrying … in place after
-  DatabaseFailure" line 14 s into a database outage, in the one run where no event was mid-flight when the login
-  was cut. In the three runs where the check passed, one event was mid-flight, and its failed write logs at once.
-- **What is not known:** whether a read-stage failure logs late (a slow failed connection attempt) or never. By
-  the code it should log at once (`PostingStore._exists` raises `DatabaseFailure`; `PostingConsumer.run_once` logs
-  the retry). The run disagrees.
-- **What is in place to find out (PR #18):** the S07 test waits up to 45 s for the line and prints every stored
-  posting line of the last 90 s, pass or fail; the workflow keeps 3,000 stack-log lines. Read the S07 block in the
-  next batch outputs.
-- **Then:** if the line comes late, keep the bounded wait and say so in the catalog entry (new lock). If it never
-  comes, find why the consumer isn't reaching the retry path (blocked in a connection attempt? idle?), fix the
-  service, and correct the entry. Either way record it in the verification log; don't mark S07's evidence as
-  confirmed before that. The wait going from 14 s to 45 s loosens one assertion: tell the owner.
+## Solved in PR #18: stored log lines were being lost (it showed up as S07 failing)
+- **The defect:** the log handler's insert of **one** row was refused for the insert-only role `ops_app`
+  (`InsufficientPrivilege`, SQL state 42501): SQLAlchemy adds `RETURNING id` to a one-row insert, and `RETURNING`
+  needs SELECT. Batches of two or more were stored. The handler dropped a failed batch silently, so nothing said so.
+- **The fixes:** `implicit_returning=False` on `log_event` and `alert_evaluation` (the role still has INSERT only);
+  the handler keeps a failed batch, retries it in order (20 tries) and reports each failure on stderr with the
+  error's type and SQL state; real-database tests store lines one at a time as `ops_app`.
+- **How it was found** (verification log M3 Phase 2, #14o to #14z3): two wrong guesses first (a late line; a
+  blocked call), then three diagnostics that each ruled something out: the stored lines printed by the test, a
+  thread dump (`docker compose kill -s SIGUSR1 posting`, kept as an operator tool), and the service's console
+  lines. **Lesson for this repo: when a run disagrees with the code, add a diagnostic and run again; don't guess a
+  second time.**
+- **S07's test** checks at once for at least 3 stored retry lines; the temporary 45 s wait is gone.
+- **Any new insert-only table needs `implicit_returning=False`** and a one-row test as the real role.
 
 ## Next: Phase 3, and what to settle before its first commit freezes the pre-registration
 - **Every catalog evidence line was audited against the code** (verification log M3 Phase 2 #14l). S07, S13, S14
