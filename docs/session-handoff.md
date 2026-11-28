@@ -18,6 +18,11 @@ complete. The owner's "Milestone 3" (a read-only AI investigator plus human-appr
 - **Always ask before:** paid model spend, publishing, deleting data, weakening a test or gate.
 - **Machine sharing:** other sessions use this laptop (Stage 9's M13 paid Phase 3, then Stage 11's benchmark chain).
   Before every real-stack batch in Phases 2, 4 and 5: `scripts\quiet_check.ps1 -Minutes 5`, then **ask the owner**.
+  **The quiet check alone is never enough:** start a batch only after the owner says "machine is free".
+- **The Phase 2 batch is approved, waiting for "machine is free"** (owner, 2026-11-27): then run the 12 remaining
+  scenarios one at a time, bring the stack down with data kept, and give a 5-line report.
+- **Edits: file tools only, never a shell heredoc** (`CLAUDE.md`, Windows notes).
+- Work straight through; don't wait between steps unless a rule here requires it.
   Use scratch topics for probes. Bring the stack down afterwards and keep the data. Offline and unit work can go on
   at any time. Work only in this repo's folder.
 - **The live run (Phase 7)** is pre-approved with a hard cap of **$3**. Before it: re-check Haiku 5.5's price on
@@ -44,9 +49,9 @@ complete. The owner's "Milestone 3" (a read-only AI investigator plus human-appr
 |---|---|
 | Plans for all 18 scenarios as pure data (`app/scenarios/`: `catalog.py`, `steps.py`, `plans.py`); `python -m app.scenarios list` and `plan <id> [--run N] [--pair A]` | done, merged (PR #13). Every (scenario, run) owns 50 members (GR-30000 up) and 80 stays (BR/ML-0100 up); runs 0 to 12 |
 | Lag calculation and a read-only reader (`app/ops/lag.py`); alert rules (`ops/alert-rules.yaml`) and evaluator (`app/ops/alerts.py`) | done, merged (PR #13) |
-| The `ops` database (`app/ops/tables.py`, `migrations/ops/`): `log_event`, `change_event`, `member_question`, `alert_evaluation`, `runbook_section`; the insert-only role `ops_app`; the log handler `app/ops/logsink.py`, installed by the four services | built, PR #14. `OPS_DB_PASSWORD` is in the owner's `.env` (added 2026-11-27 with `new_env.ps1 -AddMissing`; preflight `core` READY) |
-| The executor (`executor.py`), the local-stack adapter (`stack.py`, `kafka_io.py`), `trigger` and `reset` with a manifest in `.scenario-runs/` (`run.py`), `scripts\scenario.ps1`, `LEDGER_TIMEOUT_SECONDS` | built, PR #14. Real-stack tests for S01, S02, S05, S11, S13, S16 run in CI (`tests/test_scenarios_real.py`) |
-| The other 12 scenarios on a real stack (S03, S04, S06 to S10, S12, S14, S15, S17, S18) | **not run yet**. This is the batch on the owner's machine: quiet check and the owner's OK first. Expect fixes: none of their side effects has met a real broker yet |
+| The `ops` database (`app/ops/tables.py`, `migrations/ops/`): `log_event`, `change_event`, `member_question`, `alert_evaluation`, `runbook_section`; the insert-only role `ops_app`; the log handler `app/ops/logsink.py`, installed by the four services | done, merged (PR #14); the role's rights verified on real Postgres in CI. `OPS_DB_PASSWORD` is in the owner's `.env` (added 2026-11-27 with `new_env.ps1 -AddMissing`; preflight `core` READY) |
+| The executor (`executor.py`), the local-stack adapter (`stack.py`, `kafka_io.py`), `trigger` and `reset` with a manifest in `.scenario-runs/` (`run.py`), `scripts\scenario.ps1`, `LEDGER_TIMEOUT_SECONDS` | done, merged (PR #14). S01, S02, S05, S11, S13 and S16 triggered and reset on CI's stack (`tests/test_scenarios_real.py`; 91 real-stack tests passed, run 46058085179) |
+| The other 12 scenarios on a real stack (S03, S04, S06 to S10, S12, S14, S15, S17, S18) | **not run yet**. This is the batch on the owner's machine, approved and waiting for "machine is free". Command per scenario: `scripts\scenario.ps1 trigger S03`, then `scripts\scenario.ps1 reset S03` (S15: `-Pair A`, then `-Pair B -Run 1`). Expect fixes: compose restarts, the role switch, the group flap and the alert step have never met a real stack |
 | Kafka SASL and ACLs, in its own PR | **not started**. Adds Kafka passwords to `.env` (already approved); the real-stack tests must pass before merge |
 
 **The stack on this machine was created before the `ops` database existed.** The next `scripts\stack.ps1 up`
@@ -63,8 +68,10 @@ rebuilds the image and `db-init` creates and migrates `ops`; no data is deleted.
 - **The adapter never writes a posting, outbox row, parked event or credit.** It writes only the scenario's own
   evidence rows in `ops`, and the reset deletes only the runbook line its trigger planted (by tag).
 - **Never edit a file through a shell heredoc here.** One turned a backslash into a line break inside
-  `docker-compose.yml` and only CI caught it (verification log M3 Phase 2 #9). Use the editor tools, or a script
-  file run with `uv run python`. `tests/test_compose_file.py` now parses the compose file offline.
+  `docker-compose.yml` and only CI caught it (verification log M3 Phase 2 #9). The owner's rule since then: file
+  tools only. `tests/test_compose_file.py` now parses the compose file offline.
+- **S13's evidence is on the topic only.** The posting row has no `occurred_at`, so the investigator's `get_events`
+  (Phase 4) must return an event's `occurred_at` next to the broker's timestamp. No test asserts that evidence yet.
 - **A CI-only timing race was found and fixed** (PR #12): tests that need the retry worker to reach a fault point
   must use `first_claim(worker)`, never a single `run_once()` straight after parking.
 - **Replay (Phase 5):** the posting service reports an already-parked event ID as a duplicate, so a dead parked
