@@ -204,8 +204,10 @@ set differs from the entry's.
 - **Expected behaviour:** points post normally. The events' times are wrong, so anything that counts a waiting
   period from checkout (Stage 9's missing-points rule) decides wrongly for these stays.
 - **Root cause:** `producer_clock_skew`
-- **Evidence:** events whose `occurred_at` is later than the broker's timestamp for the same offset, and later
-  than their own `posted_at`; no errors, no parked events, no dead letters.
+- **Evidence:** on the `stay.checked_out` topic, events whose `occurred_at` (in the event itself) is hours later
+  than the broker's timestamp for the same offset. The skew is visible **only there**: the posting row and
+  `points.posted` don't store `occurred_at`, so the posting database alone shows nothing wrong. Also: a posting row
+  for every event, no errors, no parked events, no dead letters.
 - **Recovery:** `none`. Nothing failed to post. The property's clock must be fixed.
 - **Affected members:** the members of the skewed events: their points are right, their dates are wrong.
 - **Reset:** `reset S13`
@@ -294,6 +296,6 @@ Expected to need more than the rules: **S06, S07, S09, S12, S13, S14, S15, S16 a
 | S06, S07, S14, S17 | stored logs (`log_event`) |
 | S07, S09, S14, S18 | the consumer-lag reader |
 | S12 | the change record (`change_event`) and a ledger-timeout setting on the posting service |
-| S13 | a clock offset in the load generator |
+| S13 | a clock offset on the events the trigger sends; an event reader that returns `occurred_at` next to the broker's timestamp |
 | S16 | a stored member question |
 | S18 | alert rules and their evaluator |
