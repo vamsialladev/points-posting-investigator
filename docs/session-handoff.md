@@ -2,7 +2,8 @@
 
 **Updated:** 2026-11-28 (UTC). **RFC-0002 Phase 1 is done and Phase 2 is done except Kafka SASL and ACLs.** All 18
 scenarios trigger and reset on a real stack in GitHub Actions (6 in the required CI job, 12 in the "Scenario batch"
-workflow). Merged: PRs #11 to #16. Open: #17 (Kafka logins and the access list). Milestone 2
+workflow), and Kafka asks every client for a login with a broker-enforced access list. Merged: PRs #11 to #17.
+Open: #18 (rebalance log lines, catalog corrections, and the S07 diagnosis below). Milestone 2
 is complete. The owner's "Milestone 3" (a read-only AI investigator plus human-approved replay) runs as the phases of
 `docs/rfcs/RFC-0002-investigator-and-approved-replay.md` across spec M3, M6 and M7 (ADR-0019).
 
@@ -57,6 +58,38 @@ Already approved:
 
 **Before Phase 3's first commit,** any correction to a pre-registered file needs
 `uv run python scripts/prereg_lock.py --write` in the same commit. After it, those files don't change.
+
+## Solved in PR #18: stored log lines were being lost (it showed up as S07 failing)
+- **The defect:** the log handler's insert of **one** row was refused for the insert-only role `ops_app`
+  (`InsufficientPrivilege`, SQL state 42501): SQLAlchemy adds `RETURNING id` to a one-row insert, and `RETURNING`
+  needs SELECT. Batches of two or more were stored. The handler dropped a failed batch silently, so nothing said so.
+- **The fixes:** `implicit_returning=False` on `log_event` and `alert_evaluation` (the role still has INSERT only);
+  the handler keeps a failed batch, retries it in order (20 tries) and reports each failure on stderr with the
+  error's type and SQL state; real-database tests store lines one at a time as `ops_app`.
+- **How it was found** (verification log M3 Phase 2, #14o to #14z3): two wrong guesses first (a late line; a
+  blocked call), then three diagnostics that each ruled something out: the stored lines printed by the test, a
+  thread dump (`docker compose kill -s SIGUSR1 posting`, kept as an operator tool), and the service's console
+  lines. **Lesson for this repo: when a run disagrees with the code, add a diagnostic and run again; don't guess a
+  second time.**
+- **S07's test** checks at once for at least 3 stored retry lines; the temporary 45 s wait is gone.
+- **Any new insert-only table needs `implicit_returning=False`** and a one-row test as the real role.
+
+## Next: Phase 3, and what to settle before its first commit freezes the pre-registration
+- **Every catalog evidence line was audited against the code** (verification log M3 Phase 2 #14l). S07, S13, S14
+  and S06 were corrected. Before the freeze, read the catalog once more against the latest batch output.
+- **Order of work:**
+  1. A read-only evidence layer that both the rules and the investigator use (planned as `app/evidence/`, so it
+     doesn't freeze anything): the database roles `posting_investigator`, `ledger_investigator` and an `ops` reader,
+     with views that leave out raw payload bytes; the Kafka login `investigator` (ADR-0021, already enforced by the
+     broker); typed, bounded reads that return evidence IDs. An event reader must return `occurred_at` next to the
+     broker's timestamp (S13).
+  2. Capture an evidence snapshot per scenario in the batch workflow (after the trigger, before the reset), keep
+     them as an artifact, and commit the 18 dev snapshots as fixtures, so the rules and the mock evaluation run
+     offline in CI.
+  3. Only then `app/arms/rules.py`: a pure function from a snapshot to ranked root-cause codes, cited facts, a
+     recovery code with its message set, and affected members. Its first commit is the freeze.
+- **New database role passwords** will be needed (`INVESTIGATOR_DB_PASSWORD`): `new_env.ps1 -AddMissing` is
+  already approved.
 
 ## Phase 2, piece by piece
 | Piece | State |

@@ -46,6 +46,10 @@ log_event = Table(
     CheckConstraint(f"char_length(message) <= {MESSAGE_LIMIT}", name="log_message_bounded"),
     Index("log_event_logged_at_idx", "logged_at"),
     Index("log_event_correlation_idx", "correlation_id", postgresql_where=text("correlation_id IS NOT NULL")),
+    # No `RETURNING id` on insert: RETURNING needs SELECT, and the services' role has INSERT only. With the
+    # default, a one-row insert asked for the new id and was refused (SQL state 42501), while a many-row insert
+    # didn't ask and worked: single log lines were lost (found in scenario S07; verification log, M3 Phase 2).
+    implicit_returning=False,
 )
 
 change_event = Table(
@@ -85,6 +89,7 @@ alert_evaluation = Table(
     Column("missing", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
     CheckConstraint("state IN ('firing', 'quiet', 'not_evaluated')", name="alert_state_known"),
     Index("alert_evaluation_at_idx", "evaluated_at"),
+    implicit_returning=False,  # the services' role may INSERT here but not SELECT (see log_event)
 )
 
 runbook_section = Table(

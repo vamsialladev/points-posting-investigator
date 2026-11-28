@@ -65,7 +65,7 @@ set differs from the entry's.
 - **Rules enough:** yes
 
 ### S02: Duplicate event delivery
-- **Trigger:** `trigger S02`. Sends each event more than once (the load generator's `--duplicates`).
+- **Trigger:** `trigger S02`. Sends each event two or three times, with the same event ID.
 - **Expected behaviour:** one posting and one credit per stay revision; the extra deliveries are reported as
   duplicates.
 - **Root cause:** `duplicate_delivery`
@@ -117,8 +117,9 @@ set differs from the entry's.
 - **Expected behaviour:** uncommitted events are redelivered; the ledger returns the same entry for the same key;
   nothing is lost and nothing is credited twice.
 - **Root cause:** `consumer_restart`
-- **Evidence:** a gap in `posted_at`; the posting service's counters start again from zero; a start-up line in
-  the stored logs; duplicate outcomes right after the restart.
+- **Evidence:** a "posting service started" line in the stored logs during the incident, followed by a
+  "partitions assigned" line; a gap in `posted_at`; the posting service's counters start again from zero.
+  Sometimes, not always: duplicate outcomes right after the restart.
 - **Recovery:** `none`
 - **Affected members:** none lost; postings in the window are a few seconds late.
 - **Reset:** `reset S06`
@@ -171,8 +172,9 @@ set differs from the entry's.
 - **Expected behaviour:** postings and ledger credits are written; `points.posted` is not published until the
   relay starts again.
 - **Root cause:** `outbox_relay_stopped`
-- **Evidence:** outbox rows `pending` with rising age; `outbox_unpublished_rows` rising while the relay's metrics
-  stop answering; no new `points.posted` offsets; posting rows and credits present.
+- **Evidence:** outbox rows `pending` with rising age, in the outbox table; the relay's own metrics endpoint not
+  answering (so its `outbox_unpublished_rows` can't be read: the count comes from the table); no new
+  `points.posted` offsets; no relay lines in the stored logs after it stopped; posting rows and credits present.
 - **Recovery:** `none`. The rows are not dead. An operator starts the relay and it publishes them.
 - **Affected members:** none lost; their points are in the ledger, but downstream readers haven't been told.
 - **Reset:** `reset S10` (start the relay)
@@ -192,8 +194,9 @@ set differs from the entry's.
 - **Rules enough:** yes
 
 ### S12: Recent config change
-- **Trigger:** `trigger S12`. Records a configuration change, restarts the posting service with a ledger timeout
-  far below the ledger's normal answer time, then sends events. The ledger itself is not slowed.
+- **Trigger:** `trigger S12`. Records a configuration change, restarts the posting service and its retry worker
+  with a ledger timeout far below the ledger's normal answer time, then sends events. The ledger itself is not
+  slowed.
 - **Expected behaviour:** as S03 from the pipeline's side: timeouts, transient parking, nothing dead-lettered.
 - **Root cause:** `recent_config_change`
 - **Evidence:** parked events with `error_class` `ledger_timeout_not_found`; ledger request times low and normal; a change
@@ -220,11 +223,13 @@ set differs from the entry's.
 
 ### S14: Partition rebalance storm
 - **Trigger:** `trigger S14`. Makes extra consumers join and leave the posting group repeatedly while events flow.
-- **Expected behaviour:** partitions move again and again; some events are redelivered; nothing is lost and nothing
+- **Expected behaviour:** partitions move again and again; an event can be redelivered; nothing is lost and nothing
   is credited twice; posting is slow while it lasts.
 - **Root cause:** `rebalance_storm`
-- **Evidence:** lag rising and falling in steps; `posting_offset_commit_failures_total` rising; duplicate outcomes;
-  rebalance lines in the stored logs; no ledger errors.
+- **Evidence:** many "partitions revoked" and "partitions assigned" lines from the posting service within a short
+  time, in the stored logs; postings slow while it lasts; no ledger errors and nothing parked. Sometimes, not
+  always: duplicate outcomes, and "offset commit failed" lines with `posting_offset_commit_failures_total` rising.
+  Lag rises and falls while it lasts, but lag is read live and isn't stored.
 - **Recovery:** `none`. An operator removes the flapping consumer.
 - **Affected members:** none lost; postings are late.
 - **Reset:** `reset S14`

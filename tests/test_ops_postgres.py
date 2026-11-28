@@ -48,6 +48,35 @@ def test_the_handler_stores_lines_as_the_insert_only_role(ops_engine, admin):
     ]
 
 
+@pytest.mark.parametrize("lines", [1, 2, 7])
+def test_the_handler_stores_one_line_at_a_time_as_well_as_several(ops_engine, admin, lines):
+    """One line at a time is how lines arrive during a slow failure (a retry every few seconds). The first version
+    of this file only stored two at once, which hid that a single-row insert asked for `RETURNING id`, needed
+    SELECT, and was refused for the insert-only role: single lines were lost (verification log, M3 Phase 2)."""
+    said: list[str] = []
+    handler = logsink.OpsLogHandler("posting", logsink.postgres_writer(ops_engine), report=said.append)
+    logger = logging.Logger("posting")
+    logger.addHandler(handler)
+    for n in range(lines):
+        logger.warning("retrying stay.checked_out/0@%s in place after DatabaseFailure (attempt %s)", n, n + 1)
+        assert handler.drain() == 1, "each line is written by itself"
+    assert said == [], "no write was refused"
+    assert (handler.stats.stored, handler.stats.dropped_failed) == (lines, 0)
+    with admin_connect(admin, OPS) as conn:
+        assert conn.execute("SELECT count(*) FROM log_event").fetchone() == (lines,)
+
+
+def test_a_single_alert_evaluation_is_stored_through_the_table_as_the_services_role(ops_engine, admin):
+    from sqlalchemy import insert
+
+    from app.ops.tables import alert_evaluation
+
+    with ops_engine.begin() as conn:
+        conn.execute(insert(alert_evaluation), [{"rule": "postings_dropped", "state": "quiet"}])
+    with admin_connect(admin, OPS) as conn:
+        assert conn.execute("SELECT rule, state FROM alert_evaluation").fetchall() == [("postings_dropped", "quiet")]
+
+
 def test_the_services_role_can_add_an_alert_evaluation(passwords, host, admin, ops_engine):
     with runtime_connect(OPS, passwords, host) as conn:
         conn.execute(

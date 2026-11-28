@@ -12,6 +12,8 @@ written to `.scenario-runs/batch/`.
 
 from __future__ import annotations
 
+import subprocess
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 
@@ -44,6 +46,37 @@ def triggered(effects, scenario: str, pair: str | None = None) -> Iterator[steps
         yield built
     finally:
         phase(effects, "reset", built)
+
+
+def thread_dump(service: str) -> str:
+    """Ask a stack service for every thread's stack (SIGUSR1, faulthandler) and return what it wrote. Diagnostic
+    only: it never fails a test, and says so when the dump can't be taken."""
+    compose = ["docker", "compose", "--profile", "core"]
+    try:
+        subprocess.run([*compose, "kill", "-s", "SIGUSR1", service], cwd=run.ROOT, capture_output=True, timeout=30)
+        time.sleep(1.0)
+        logs = subprocess.run(
+            [*compose, "logs", "--no-log-prefix", "--tail", "200", service],
+            cwd=run.ROOT,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return f"thread dump of {service}: not taken ({type(exc).__name__})"
+    lines = (logs.stdout + logs.stderr).splitlines()
+    starts = [n for n, line in enumerate(lines) if line.startswith(("Thread 0x", "Current thread 0x"))]
+    if not starts:
+        return f"thread dump of {service}: no stack found in its last 200 log lines"
+    # The service's own console lines just before the dump (its ledger request lines left out): what it logged,
+    # whether or not the log handler stored it.
+    before = [line for line in lines[: starts[0]] if "HTTP Request:" not in line and "rdkafka" not in line][-30:]
+    return (
+        f"console of {service} before the dump:\n"
+        + "\n".join("  " + line[:170] for line in before)
+        + f"\nthread dump of {service}:\n"
+        + "\n".join("  " + line[:170] for line in lines[starts[0] :][:60])
+    )
 
 
 def ids(events) -> list[str]:
@@ -124,14 +157,23 @@ def test_s07_a_posting_database_outage_makes_partitions_wait_and_nothing_is_lost
         print(f"S07: {len(posted)}/{len(events)} posted, {len(in_flight)} credited without a posting row yet")
         assert len(in_flight) <= partitions, "at most one event per partition was past its reads when the cut came"
         assert len(credited) <= len(posted) + partitions, "no event was credited after the database went away"
-        retries = rows(
+        # The retry lines, checked at once, with no wait. This check failed in two runs while the service was doing
+        # the right thing: its log handler lost single lines (a one-row insert asked for RETURNING, which the
+        # insert-only role may not do). By now the outage is at least 10 s old and the service has retried about
+        # five times with its growing wait, so three stored lines is a floor (verification log, M3 Phase 2).
+        stored = rows(
             effects,
             "ops",
-            "SELECT count(*) FROM log_event WHERE service = 'posting' AND level = 'WARNING'"
-            " AND message LIKE %s AND logged_at > now() - interval '2 minutes'",
-            ("retrying %in place after DatabaseFailure%",),
+            "SELECT to_char(logged_at, 'HH24:MI:SS.MS'), level, message FROM log_event"
+            " WHERE service = 'posting' AND logged_at > now() - interval '90 seconds' ORDER BY id",
         )
-        assert retries[0][0] >= 1, "the outage left retry lines in the stored logs"
+        retries = [line for line in stored if line[1] == "WARNING" and "in place after DatabaseFailure" in line[2]]
+        print(f"S07: {len(stored)} stored posting lines in the last 90 s; {len(retries)} are DatabaseFailure retries")
+        if len(retries) < 3:  # only then: what the service logged on its console, and where its threads are
+            print(thread_dump("posting"))
+            for at, level, message in stored[-40:]:
+                print(f"  {at} {level} {message[:140]}")
+        assert len(retries) >= 3, "the outage left the service's retry lines in the stored logs"
     assert_all_posted_and_credited_once(effects, built.manifest.events)
 
 
@@ -180,8 +222,22 @@ def test_s12_a_lowered_timeout_parks_events_with_a_change_record_just_before(eff
 
 
 def test_s14_a_rebalance_storm_loses_nothing_and_credits_nothing_twice(effects):
+    def rebalance_lines() -> int:
+        found = rows(
+            effects,
+            "ops",
+            "SELECT count(*) FROM log_event WHERE service = 'posting'"
+            " AND (message LIKE 'partitions revoked:%%' OR message LIKE 'partitions assigned:%%')"
+            " AND logged_at > now() - interval '3 minutes'",
+        )
+        return int(found[0][0])
+
+    before = rebalance_lines()
     with triggered(effects, "S14") as built:
-        pass
+        flaps = next(s.times for s in built.trigger if isinstance(s, steps.GroupFlap))
+        # Each join and each leave moves the posting service's partitions at least once. Half of that is asserted,
+        # so a rebalance that covers two changes at once doesn't fail the test.
+        assert rebalance_lines() - before >= flaps, "the storm left assigned and revoked lines in the stored logs"
     assert_all_posted_and_credited_once(effects, built.manifest.events)
 
 

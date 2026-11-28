@@ -65,7 +65,7 @@ jobs:
           TEST_RELAY_METRICS_URL: http://127.0.0.1:9108/metrics
       - name: Stack logs (always, for the evidence)
         if: always()
-        run: docker compose --profile core logs --tail 400 > scenario-batch-stack-logs.txt 2>&1
+        run: docker compose --profile core logs --tail 3000 > scenario-batch-stack-logs.txt 2>&1
       - name: Keep the run manifests and the stack logs
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

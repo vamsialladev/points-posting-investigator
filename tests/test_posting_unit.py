@@ -381,13 +381,51 @@ def test_the_offset_is_committed_after_the_service_returns(outcome):
 )
 def test_a_retryable_failure_seeks_back_and_commits_nothing(failure, caplog):
     posting, _, consumer, sleeps = loop(failure)
-    with caplog.at_level("WARNING", logger="app.pipeline.posting"):
+    with caplog.at_level("WARNING", logger="posting"):
         assert posting.run_once() is Outcome.RETRY
     assert consumer.commits == [] and consumer.seeks == [("stay.checked_out", 1, 7)]
     assert sleeps and sleeps[0] > 0
     # The retry leaves a log line naming the failure's type and the message, never the failure's text (S07).
     (line,) = [record.getMessage() for record in caplog.records]
     assert line == f"retrying stay.checked_out/1@7 in place after {type(failure).__name__} (attempt 1)"
+
+
+def test_a_rebalance_leaves_one_line_naming_the_partitions(caplog):
+    from types import SimpleNamespace
+
+    from app.pipeline.posting import log_rebalance
+
+    partitions = [SimpleNamespace(topic="stay.checked_out", partition=n) for n in (2, 0)]
+    with caplog.at_level("INFO", logger="posting"):
+        log_rebalance("assigned", partitions)
+        log_rebalance("revoked", [])
+    assert [record.getMessage() for record in caplog.records] == [
+        "partitions assigned: stay.checked_out/0, stay.checked_out/2",
+        "partitions revoked: none",
+    ]
+
+
+def test_the_consumer_subscribes_with_callbacks_that_only_log(monkeypatch):
+    """The callbacks must not take over the assignment: they never call assign() or unassign()."""
+    from app.pipeline import posting as module
+
+    calls: dict[str, object] = {}
+
+    class Recorder:
+        def __init__(self, config):
+            calls["config"] = config
+
+        def subscribe(self, topics, on_assign=None, on_revoke=None):
+            calls.update(topics=topics, on_assign=on_assign, on_revoke=on_revoke)
+
+        def __getattr__(self, name):  # assign, unassign, anything else: the callbacks must not touch the consumer
+            raise AssertionError(f"a rebalance callback called consumer.{name}")
+
+    monkeypatch.setattr(module, "Consumer", Recorder)
+    consumer = module.make_consumer("127.0.0.1:9092", "posting-service", ["stay.checked_out"])
+    assert calls["topics"] == ["stay.checked_out"] and calls["config"]["enable.auto.commit"] is False
+    calls["on_assign"](consumer, [])  # type: ignore[operator]
+    calls["on_revoke"](consumer, [])  # type: ignore[operator]
 
 
 def test_retry_waits_grow_and_reset_after_a_success():
