@@ -1,0 +1,1493 @@
+{
+  "scenario_run": "S15-A-run0",
+  "taken_at": "2026-11-28T14:12:48.490616+00:00",
+  "since": "2026-11-28T14:11:29+00:00",
+  "truncated": [],
+  "items": [
+    {
+      "id": "posting:03c4e9c8-9620-5bc9-a8b0-6b71856e8577",
+      "kind": "posting",
+      "at": "2026-11-28T14:11:29.940630+00:00",
+      "data": {
+        "stay_id": "BR-0660",
+        "revision": 1,
+        "member_number": "GR-30700",
+        "stay_points": 1500,
+        "credited_points": 1500,
+        "ledger_entry_id": "L-0000197",
+        "correlation_id": "corr-03c4e9c8"
+      }
+    },
+    {
+      "id": "posting:54d834f2-9d2e-5615-bc80-b364bca76170",
+      "kind": "posting",
+      "at": "2026-11-28T14:11:35.101094+00:00",
+      "data": {
+        "stay_id": "ML-0660",
+        "revision": 1,
+        "member_number": "GR-30701",
+        "stay_points": 3020,
+        "credited_points": 3020,
+        "ledger_entry_id": "L-0000198",
+        "correlation_id": "corr-54d834f2"
+      }
+    },
+    {
+      "id": "posting:5c53fea7-60de-5915-a9ec-6b62739da3a3",
+      "kind": "posting",
+      "at": "2026-11-28T14:11:40.248799+00:00",
+      "data": {
+        "stay_id": "BR-0664",
+        "revision": 1,
+        "member_number": "GR-30708",
+        "stay_points": 1580,
+        "credited_points": 1580,
+        "ledger_entry_id": "L-0000199",
+        "correlation_id": "corr-5c53fea7"
+      }
+    },
+    {
+      "id": "posting:145c2152-6864-58db-b357-b9ed549073d5",
+      "kind": "posting",
+      "at": "2026-11-28T14:11:45.392078+00:00",
+      "data": {
+        "stay_id": "ML-0664",
+        "revision": 1,
+        "member_number": "GR-30709",
+        "stay_points": 3180,
+        "credited_points": 3180,
+        "ledger_entry_id": "L-0000200",
+        "correlation_id": "corr-145c2152"
+      }
+    },
+    {
+      "id": "posting:d471911a-8872-51b1-8553-68899c781272",
+      "kind": "posting",
+      "at": "2026-11-28T14:11:50.523607+00:00",
+      "data": {
+        "stay_id": "BR-0681",
+        "revision": 1,
+        "member_number": "GR-30727",
+        "stay_points": 4560,
+        "credited_points": 4560,
+        "ledger_entry_id": "L-0000201",
+        "correlation_id": "corr-d471911a"
+      }
+    },
+    {
+      "id": "posting:c0f5e41f-cf49-5a51-adbd-6c464b92d64d",
+      "kind": "posting",
+      "at": "2026-11-28T14:12:00.715439+00:00",
+      "data": {
+        "stay_id": "BR-0680",
+        "revision": 1,
+        "member_number": "GR-30725",
+        "stay_points": 1500,
+        "credited_points": 1500,
+        "ledger_entry_id": "L-0000202",
+        "correlation_id": "corr-c0f5e41f"
+      }
+    },
+    {
+      "id": "posting:46e6da65-c532-5f06-880d-ef70e7501e8d",
+      "kind": "posting",
+      "at": "2026-11-28T14:12:05.789775+00:00",
+      "data": {
+        "stay_id": "BR-0683",
+        "revision": 1,
+        "member_number": "GR-30731",
+        "stay_points": 4680,
+        "credited_points": 4680,
+        "ledger_entry_id": "L-0000203",
+        "correlation_id": "corr-46e6da65"
+      }
+    },
+    {
+      "id": "posting:e55f02f2-00e3-54fd-a1e5-1e2853d41707",
+      "kind": "posting",
+      "at": "2026-11-28T14:12:20.457611+00:00",
+      "data": {
+        "stay_id": "BR-0682",
+        "revision": 1,
+        "member_number": "GR-30729",
+        "stay_points": 1540,
+        "credited_points": 1540,
+        "ledger_entry_id": "L-0000204",
+        "correlation_id": "corr-e55f02f2"
+      }
+    },
+    {
+      "id": "posting:6510c62b-041d-5ecd-9279-a8ec78bf3177",
+      "kind": "posting",
+      "at": "2026-11-28T14:12:26.001334+00:00",
+      "data": {
+        "stay_id": "ML-0681",
+        "revision": 1,
+        "member_number": "GR-30728",
+        "stay_points": 6120,
+        "credited_points": 6120,
+        "ledger_entry_id": "L-0000205",
+        "correlation_id": "corr-6510c62b"
+      }
+    },
+    {
+      "id": "posting:6ac83331-97f9-5e59-810d-88619b126dbd",
+      "kind": "posting",
+      "at": "2026-11-28T14:12:31.086348+00:00",
+      "data": {
+        "stay_id": "BR-0662",
+        "revision": 1,
+        "member_number": "GR-30704",
+        "stay_points": 1540,
+        "credited_points": 1540,
+        "ledger_entry_id": "L-0000206",
+        "correlation_id": "corr-6ac83331"
+      }
+    },
+    {
+      "id": "posting:1b6abc61-d379-5730-bd06-1a2b0eb502ec",
+      "kind": "posting",
+      "at": "2026-11-28T14:12:36.142277+00:00",
+      "data": {
+        "stay_id": "ML-0661",
+        "revision": 1,
+        "member_number": "GR-30703",
+        "stay_points": 6120,
+        "credited_points": 6120,
+        "ledger_entry_id": "L-0000207",
+        "correlation_id": "corr-1b6abc61"
+      }
+    },
+    {
+      "id": "posting:444efbcc-2c4d-51ff-8805-4ee0db7a466c",
+      "kind": "posting",
+      "at": "2026-11-28T14:12:41.203319+00:00",
+      "data": {
+        "stay_id": "ML-0680",
+        "revision": 1,
+        "member_number": "GR-30726",
+        "stay_points": 3020,
+        "credited_points": 3020,
+        "ledger_entry_id": "L-0000208",
+        "correlation_id": "corr-444efbcc"
+      }
+    },
+    {
+      "id": "outbox:193",
+      "kind": "outbox",
+      "at": "2026-11-28T14:11:29.940630+00:00",
+      "data": {
+        "topic": "points.posted",
+        "message_key": "GR-30700",
+        "status": "published",
+        "attempts": 0,
+        "last_error": null,
+        "published_at": "2026-11-28T14:11:30.048874+00:00",
+        "dead_at": null
+      }
+    },
+    {
+      "id": "outbox:194",
+      "kind": "outbox",
+      "at": "2026-11-28T14:11:35.101094+00:00",
+      "data": {
+        "topic": "points.posted",
+        "message_key": "GR-30701",
+        "status": "pending",
+        "attempts": 0,
+        "last_error": null,
+        "published_at": null,
+        "dead_at": null
+      }
+    },
+    {
+      "id": "outbox:195",
+      "kind": "outbox",
+      "at": "2026-11-28T14:11:40.248799+00:00",
+      "data": {
+        "topic": "points.posted",
+        "message_key": "GR-30708",
+        "status": "pending",
+        "attempts": 0,
+        "last_error": null,
+        "published_at": null,
+        "dead_at": null
+      }
+    },
+    {
+      "id": "outbox:196",
+      "kind": "outbox",
+      "at": "2026-11-28T14:11:45.392078+00:00",
+      "data": {
+        "topic": "points.posted",
+        "message_key": "GR-30709",
+        "status": "pending",
+        "attempts": 0,
+        "last_error": null,
+        "published_at": null,
+        "dead_at": null
+      }
+    },
+    {
+      "id": "outbox:197",
+      "kind": "outbox",
+      "at": "2026-11-28T14:11:50.523607+00:00",
+      "data": {
+        "topic": "points.posted",
+        "message_key": "GR-30727",
+        "status": "pending",
+        "attempts": 0,
+        "last_error": null,
+        "published_at": null,
+        "dead_at": null
+      }
+    },
+    {
+      "id": "outbox:198",
+      "kind": "outbox",
+      "at": "2026-11-28T14:12:00.715439+00:00",
+      "data": {
+        "topic": "points.posted",
+        "message_key": "GR-30725",
+        "status": "pending",
+        "attempts": 0,
+        "last_error": null,
+        "published_at": null,
+        "dead_at": null
+      }
+    },
+    {
+      "id": "outbox:199",
+      "kind": "outbox",
+      "at": "2026-11-28T14:12:05.789775+00:00",
+      "data": {
+        "topic": "points.posted",
+        "message_key": "GR-30731",
+        "status": "pending",
+        "attempts": 0,
+        "last_error": null,
+        "published_at": null,
+        "dead_at": null
+      }
+    },
+    {
+      "id": "outbox:200",
+      "kind": "outbox",
+      "at": "2026-11-28T14:12:20.457611+00:00",
+      "data": {
+        "topic": "points.posted",
+        "message_key": "GR-30729",
+        "status": "pending",
+        "attempts": 0,
+        "last_error": null,
+        "published_at": null,
+        "dead_at": null
+      }
+    },
+    {
+      "id": "outbox:201",
+      "kind": "outbox",
+      "at": "2026-11-28T14:12:26.001334+00:00",
+      "data": {
+        "topic": "points.posted",
+        "message_key": "GR-30728",
+        "status": "pending",
+        "attempts": 0,
+        "last_error": null,
+        "published_at": null,
+        "dead_at": null
+      }
+    },
+    {
+      "id": "outbox:202",
+      "kind": "outbox",
+      "at": "2026-11-28T14:12:31.086348+00:00",
+      "data": {
+        "topic": "points.posted",
+        "message_key": "GR-30704",
+        "status": "pending",
+        "attempts": 0,
+        "last_error": null,
+        "published_at": null,
+        "dead_at": null
+      }
+    },
+    {
+      "id": "outbox:203",
+      "kind": "outbox",
+      "at": "2026-11-28T14:12:36.142277+00:00",
+      "data": {
+        "topic": "points.posted",
+        "message_key": "GR-30703",
+        "status": "pending",
+        "attempts": 0,
+        "last_error": null,
+        "published_at": null,
+        "dead_at": null
+      }
+    },
+    {
+      "id": "outbox:204",
+      "kind": "outbox",
+      "at": "2026-11-28T14:12:41.203319+00:00",
+      "data": {
+        "topic": "points.posted",
+        "message_key": "GR-30726",
+        "status": "pending",
+        "attempts": 0,
+        "last_error": null,
+        "published_at": null,
+        "dead_at": null
+      }
+    },
+    {
+      "id": "parked:24",
+      "kind": "parked",
+      "at": "2026-11-28T14:11:30.039613+00:00",
+      "data": {
+        "event_id": "54d834f2-9d2e-5615-bc80-b364bca76170",
+        "member_number": "GR-30701",
+        "stay_id": "ML-0660",
+        "revision": 1,
+        "source_topic": "stay.checked_out",
+        "source_partition": 1,
+        "source_offset": 48,
+        "status": "done",
+        "attempts": 0,
+        "transient_failures": 1,
+        "error_class": "ledger_rate_limited",
+        "last_error": "rate_limited",
+        "correlation_id": "corr-54d834f2",
+        "first_failed_at": "2026-11-28T14:11:30.039613+00:00",
+        "last_failed_at": "2026-11-28T14:11:30.039613+00:00",
+        "done_at": "2026-11-28T14:11:35.101094+00:00",
+        "dead_at": null
+      }
+    },
+    {
+      "id": "parked:25",
+      "kind": "parked",
+      "at": "2026-11-28T14:11:30.138668+00:00",
+      "data": {
+        "event_id": "0e0fccbb-fa5c-5036-b255-cbedc91adb01",
+        "member_number": "GR-30702",
+        "stay_id": "BR-0661",
+        "revision": 1,
+        "source_topic": "stay.checked_out",
+        "source_partition": 1,
+        "source_offset": 49,
+        "status": "pending",
+        "attempts": 0,
+        "transient_failures": 7,
+        "error_class": "ledger_rate_limited",
+        "last_error": "rate_limited",
+        "correlation_id": "corr-0e0fccbb",
+        "first_failed_at": "2026-11-28T14:11:30.138668+00:00",
+        "last_failed_at": "2026-11-28T14:12:28.032142+00:00",
+        "done_at": null,
+        "dead_at": null
+      }
+    },
+    {
+      "id": "parked:26",
+      "kind": "parked",
+      "at": "2026-11-28T14:11:30.238647+00:00",
+      "data": {
+        "event_id": "1b6abc61-d379-5730-bd06-1a2b0eb502ec",
+        "member_number": "GR-30703",
+        "stay_id": "ML-0661",
+        "revision": 1,
+        "source_topic": "stay.checked_out",
+        "source_partition": 2,
+        "source_offset": 62,
+        "status": "done",
+        "attempts": 0,
+        "transient_failures": 6,
+        "error_class": "ledger_rate_limited",
+        "last_error": "rate_limited",
+        "correlation_id": "corr-1b6abc61",
+        "first_failed_at": "2026-11-28T14:11:30.238647+00:00",
+        "last_failed_at": "2026-11-28T14:12:08.366356+00:00",
+        "done_at": "2026-11-28T14:12:36.142277+00:00",
+        "dead_at": null
+      }
+    },
+    {
+      "id": "parked:27",
+      "kind": "parked",
+      "at": "2026-11-28T14:11:30.338178+00:00",
+      "data": {
+        "event_id": "6ac83331-97f9-5e59-810d-88619b126dbd",
+        "member_number": "GR-30704",
+        "stay_id": "BR-0662",
+        "revision": 1,
+        "source_topic": "stay.checked_out",
+        "source_partition": 1,
+        "source_offset": 50,
+        "status": "done",
+        "attempts": 0,
+        "transient_failures": 6,
+        "error_class": "ledger_rate_limited",
+        "last_error": "rate_limited",
+        "correlation_id": "corr-6ac83331",
+        "first_failed_at": "2026-11-28T14:11:30.338178+00:00",
+        "last_failed_at": "2026-11-28T14:12:01.227994+00:00",
+        "done_at": "2026-11-28T14:12:31.086348+00:00",
+        "dead_at": null
+      }
+    },
+    {
+      "id": "parked:28",
+      "kind": "parked",
+      "at": "2026-11-28T14:11:30.437667+00:00",
+      "data": {
+        "event_id": "dbeb729f-4bdd-54c4-bfe2-351310800bd7",
+        "member_number": "GR-30705",
+        "stay_id": "ML-0662",
+        "revision": 1,
+        "source_topic": "stay.checked_out",
+        "source_partition": 1,
+        "source_offset": 51,
+        "status": "pending",
+        "attempts": 0,
+        "transient_failures": 7,
+        "error_class": "ledger_rate_limited",
+        "last_error": "rate_limited",
+        "correlation_id": "corr-dbeb729f",
+        "first_failed_at": "2026-11-28T14:11:30.437667+00:00",
+        "last_failed_at": "2026-11-28T14:12:37.162027+00:00",
+        "done_at": null,
+        "dead_at": null
+      }
+    },
+    {
+      "id": "parked:29",
+      "kind": "parked",
+      "at": "2026-11-28T14:11:30.537867+00:00",
+      "data": {
+        "event_id": "2e738894-98b4-562f-953d-95e5b321b5f1",
+        "member_number": "GR-30706",
+        "stay_id": "BR-0663",
+        "revision": 1,
+        "source_topic": "stay.checked_out",
+        "source_partition": 0,
+        "source_offset": 83,
+        "status": "pending",
+        "attempts": 0,
+        "transient_failures": 7,
+        "error_class": "ledger_rate_limited",
+        "last_error": "rate_limited",
+        "correlation_id": "corr-2e738894",
+        "first_failed_at": "2026-11-28T14:11:30.537867+00:00",
+        "last_failed_at": "2026-11-28T14:12:29.050264+00:00",
+        "done_at": null,
+        "dead_at": null
+      }
+    },
+    {
+      "id": "parked:30",
+      "kind": "parked",
+      "at": "2026-11-28T14:11:30.637693+00:00",
+      "data": {
+        "event_id": "8d17c3e1-dc8c-548c-b37a-e8c25ff691f8",
+        "member_number": "GR-30707",
+        "stay_id": "ML-0663",
+        "revision": 1,
+        "source_topic": "stay.checked_out",
+        "source_partition": 0,
+        "source_offset": 84,
+        "status": "pending",
+        "attempts": 0,
+        "transient_failures": 7,
+        "error_class": "ledger_rate_limited",
+        "last_error": "rate_limited",
+        "correlation_id": "corr-8d17c3e1",
+        "first_failed_at": "2026-11-28T14:11:30.637693+00:00",
+        "last_failed_at": "2026-11-28T14:12:31.092658+00:00",
+        "done_at": null,
+        "dead_at": null
+      }
+    },
+    {
+      "id": "parked:31",
+      "kind": "parked",
+      "at": "2026-11-28T14:11:30.738565+00:00",
+      "data": {
+        "event_id": "5c53fea7-60de-5915-a9ec-6b62739da3a3",
+        "member_number": "GR-30708",
+        "stay_id": "BR-0664",
+        "revision": 1,
+        "source_topic": "stay.checked_out",
+        "source_partition": 2,
+        "source_offset": 63,
+        "status": "done",
+        "attempts": 0,
+        "transient_failures": 2,
+        "error_class": "ledger_rate_limited",
+        "last_error": "rate_limited",
+        "correlation_id": "corr-5c53fea7",
+        "first_failed_at": "2026-11-28T14:11:30.738565+00:00",
+        "last_failed_at": "2026-11-28T14:11:36.195904+00:00",
+        "done_at": "2026-11-28T14:11:40.248799+00:00",
+        "dead_at": null
+      }
+    },
+    {
+      "id": "parked:32",
+      "kind": "parked",
+      "at": "2026-11-28T14:11:30.837719+00:00",
+      "data": {
+        "event_id": "145c2152-6864-58db-b357-b9ed549073d5",
+        "member_number": "GR-30709",
+        "stay_id": "ML-0664",
+        "revision": 1,
+        "source_topic": "stay.checked_out",
+        "source_partition": 1,
+        "source_offset": 52,
+        "status": "done",
+        "attempts": 0,
+        "transient_failures": 3,
+        "error_class": "ledger_rate_limited",
+        "last_error": "rate_limited",
+        "correlation_id": "corr-145c2152",
+        "first_failed_at": "2026-11-28T14:11:30.837719+00:00",
+        "last_failed_at": "2026-11-28T14:11:40.254596+00:00",
+        "done_at": "2026-11-28T14:11:45.392078+00:00",
+        "dead_at": null
+      }
+    },
+    {
+      "id": "parked:33",
+      "kind": "parked",
+      "at": "2026-11-28T14:11:30.938192+00:00",
+      "data": {
+        "event_id": "6c93a6b8-7c10-51d5-be6e-3e0ea8c6b7b2",
+        "member_number": "GR-30710",
+        "stay_id": "BR-0665",
+        "revision": 1,
+        "source_topic": "stay.checked_out",
+        "source_partition": 1,
+        "source_offset": 53,
+        "status": "pending",
+        "attempts": 0,
+        "transient_failures": 7,
+        "error_class": "ledger_rate_limited",
+        "last_error": "rate_limited",
+        "correlation_id": "corr-6c93a6b8",
+        "first_failed_at": "2026-11-28T14:11:30.938192+00:00",
+        "last_failed_at": "2026-11-28T14:12:34.118626+00:00",
+        "done_at": null,
+        "dead_at": null
+      }
+    },
+    {
+      "id": "parked:34",
+      "kind": "parked",
+      "at": "2026-11-28T14:11:31.038733+00:00",
+      "data": {
+        "event_id": "f7b250ba-6b7a-5ce1-b159-604fbb8ce2d7",
+        "member_number": "GR-30711",
+        "stay_id": "ML-0665",
+        "revision": 1,
+        "source_topic": "stay.checked_out",
+        "source_partition": 0,
+        "source_offset": 85,
+        "status": "pending",
+        "attempts": 0,
+        "transient_failures": 7,
+        "error_class": "ledger_rate_limited",
+        "last_error": "rate_limited",
+        "correlation_id": "corr-f7b250ba",
+        "first_failed_at": "2026-11-28T14:11:31.038733+00:00",
+        "last_failed_at": "2026-11-28T14:12:38.175714+00:00",
+        "done_at": null,
+        "dead_at": null
+      }
+    },
+    {
+      "id": "parked:35",
+      "kind": "parked",
+      "at": "2026-11-28T14:11:31.367608+00:00",
+      "data": {
+        "event_id": "c0f5e41f-cf49-5a51-adbd-6c464b92d64d",
+        "member_number": "GR-30725",
+        "stay_id": "BR-0680",
+        "revision": 1,
+        "source_topic": "stay.checked_out",
+        "source_partition": 2,
+        "source_offset": 64,
+        "status": "done",
+        "attempts": 0,
+        "transient_failures": 5,
+        "error_class": "ledger_rate_limited",
+        "last_error": "rate_limited",
+        "correlation_id": "corr-c0f5e41f",
+        "first_failed_at": "2026-11-28T14:11:31.367608+00:00",
+        "last_failed_at": "2026-11-28T14:11:52.095123+00:00",
+        "done_at": "2026-11-28T14:12:00.715439+00:00",
+        "dead_at": null
+      }
+    },
+    {
+      "id": "parked:36",
+      "kind": "parked",
+      "at": "2026-11-28T14:11:31.566556+00:00",
+      "data": {
+        "event_id": "444efbcc-2c4d-51ff-8805-4ee0db7a466c",
+        "member_number": "GR-30726",
+        "stay_id": "ML-0680",
+        "revision": 1,
+        "source_topic": "stay.checked_out",
+        "source_partition": 2,
+        "source_offset": 65,
+        "status": "done",
+        "attempts": 0,
+        "transient_failures": 6,
+        "error_class": "ledger_rate_limited",
+        "last_error": "rate_limited",
+        "correlation_id": "corr-444efbcc",
+        "first_failed_at": "2026-11-28T14:11:31.566556+00:00",
+        "last_failed_at": "2026-11-28T14:12:09.380138+00:00",
+        "done_at": "2026-11-28T14:12:41.203319+00:00",
+        "dead_at": null
+      }
+    },
+    {
+      "id": "parked:37",
+      "kind": "parked",
+      "at": "2026-11-28T14:11:31.764835+00:00",
+      "data": {
+        "event_id": "d471911a-8872-51b1-8553-68899c781272",
+        "member_number": "GR-30727",
+        "stay_id": "BR-0681",
+        "revision": 1,
+        "source_topic": "stay.checked_out",
+        "source_partition": 1,
+        "source_offset": 54,
+        "status": "done",
+        "attempts": 0,
+        "transient_failures": 4,
+        "error_class": "ledger_rate_limited",
+        "last_error": "rate_limited",
+        "correlation_id": "corr-d471911a",
+        "first_failed_at": "2026-11-28T14:11:31.764835+00:00",
+        "last_failed_at": "2026-11-28T14:11:45.407237+00:00",
+        "done_at": "2026-11-28T14:11:50.523607+00:00",
+        "dead_at": null
+      }
+    },
+    {
+      "id": "parked:38",
+      "kind": "parked",
+      "at": "2026-11-28T14:11:31.964240+00:00",
+      "data": {
+        "event_id": "6510c62b-041d-5ecd-9279-a8ec78bf3177",
+        "member_number": "GR-30728",
+        "stay_id": "ML-0681",
+        "revision": 1,
+        "source_topic": "stay.checked_out",
+        "source_partition": 0,
+        "source_offset": 86,
+        "status": "done",
+        "attempts": 0,
+        "transient_failures": 6,
+        "error_class": "ledger_rate_limited",
+        "last_error": "rate_limited",
+        "correlation_id": "corr-6510c62b",
+        "first_failed_at": "2026-11-28T14:11:31.964240+00:00",
+        "last_failed_at": "2026-11-28T14:12:03.252729+00:00",
+        "done_at": "2026-11-28T14:12:26.001334+00:00",
+        "dead_at": null
+      }
+    },
+    {
+      "id": "parked:39",
+      "kind": "parked",
+      "at": "2026-11-28T14:11:32.165644+00:00",
+      "data": {
+        "event_id": "e55f02f2-00e3-54fd-a1e5-1e2853d41707",
+        "member_number": "GR-30729",
+        "stay_id": "BR-0682",
+        "revision": 1,
+        "source_topic": "stay.checked_out",
+        "source_partition": 0,
+        "source_offset": 87,
+        "status": "done",
+        "attempts": 0,
+        "transient_failures": 6,
+        "error_class": "ledger_rate_limited",
+        "last_error": "rate_limited",
+        "correlation_id": "corr-e55f02f2",
+        "first_failed_at": "2026-11-28T14:11:32.165644+00:00",
+        "last_failed_at": "2026-11-28T14:12:03.768429+00:00",
+        "done_at": "2026-11-28T14:12:20.457611+00:00",
+        "dead_at": null
+      }
+    },
+    {
+      "id": "parked:40",
+      "kind": "parked",
+      "at": "2026-11-28T14:11:32.364435+00:00",
+      "data": {
+        "event_id": "87578313-8927-5cd3-a713-997a4130877c",
+        "member_number": "GR-30730",
+        "stay_id": "ML-0682",
+        "revision": 1,
+        "source_topic": "stay.checked_out",
+        "source_partition": 2,
+        "source_offset": 66,
+        "status": "pending",
+        "attempts": 0,
+        "transient_failures": 7,
+        "error_class": "ledger_rate_limited",
+        "last_error": "rate_limited",
+        "correlation_id": "corr-87578313",
+        "first_failed_at": "2026-11-28T14:11:32.364435+00:00",
+        "last_failed_at": "2026-11-28T14:12:26.513084+00:00",
+        "done_at": null,
+        "dead_at": null
+      }
+    },
+    {
+      "id": "parked:41",
+      "kind": "parked",
+      "at": "2026-11-28T14:11:32.564462+00:00",
+      "data": {
+        "event_id": "46e6da65-c532-5f06-880d-ef70e7501e8d",
+        "member_number": "GR-30731",
+        "stay_id": "BR-0683",
+        "revision": 1,
+        "source_topic": "stay.checked_out",
+        "source_partition": 2,
+        "source_offset": 67,
+        "status": "done",
+        "attempts": 0,
+        "transient_failures": 5,
+        "error_class": "ledger_rate_limited",
+        "last_error": "rate_limited",
+        "correlation_id": "corr-46e6da65",
+        "first_failed_at": "2026-11-28T14:11:32.564462+00:00",
+        "last_failed_at": "2026-11-28T14:11:53.129022+00:00",
+        "done_at": "2026-11-28T14:12:05.789775+00:00",
+        "dead_at": null
+      }
+    },
+    {
+      "id": "parked:42",
+      "kind": "parked",
+      "at": "2026-11-28T14:11:32.764102+00:00",
+      "data": {
+        "event_id": "b1452145-44d1-5267-bf93-ea458ab796b5",
+        "member_number": "GR-30732",
+        "stay_id": "ML-0683",
+        "revision": 1,
+        "source_topic": "stay.checked_out",
+        "source_partition": 0,
+        "source_offset": 88,
+        "status": "pending",
+        "attempts": 0,
+        "transient_failures": 7,
+        "error_class": "ledger_rate_limited",
+        "last_error": "rate_limited",
+        "correlation_id": "corr-b1452145",
+        "first_failed_at": "2026-11-28T14:11:32.764102+00:00",
+        "last_failed_at": "2026-11-28T14:12:36.148091+00:00",
+        "done_at": null,
+        "dead_at": null
+      }
+    },
+    {
+      "id": "parked:43",
+      "kind": "parked",
+      "at": "2026-11-28T14:11:32.964808+00:00",
+      "data": {
+        "event_id": "02e20ddd-2d4f-549a-892c-f59d3aa43853",
+        "member_number": "GR-30733",
+        "stay_id": "BR-0684",
+        "revision": 1,
+        "source_topic": "stay.checked_out",
+        "source_partition": 0,
+        "source_offset": 89,
+        "status": "pending",
+        "attempts": 0,
+        "transient_failures": 7,
+        "error_class": "ledger_rate_limited",
+        "last_error": "rate_limited",
+        "correlation_id": "corr-02e20ddd",
+        "first_failed_at": "2026-11-28T14:11:32.964808+00:00",
+        "last_failed_at": "2026-11-28T14:12:29.055550+00:00",
+        "done_at": null,
+        "dead_at": null
+      }
+    },
+    {
+      "id": "parked:44",
+      "kind": "parked",
+      "at": "2026-11-28T14:11:33.165954+00:00",
+      "data": {
+        "event_id": "2879f05d-4b84-5695-80e4-e42d8889ea4e",
+        "member_number": "GR-30734",
+        "stay_id": "ML-0684",
+        "revision": 1,
+        "source_topic": "stay.checked_out",
+        "source_partition": 1,
+        "source_offset": 55,
+        "status": "pending",
+        "attempts": 0,
+        "transient_failures": 7,
+        "error_class": "ledger_rate_limited",
+        "last_error": "rate_limited",
+        "correlation_id": "corr-2879f05d",
+        "first_failed_at": "2026-11-28T14:11:33.165954+00:00",
+        "last_failed_at": "2026-11-28T14:12:29.566960+00:00",
+        "done_at": null,
+        "dead_at": null
+      }
+    },
+    {
+      "id": "credit:L-0000197",
+      "kind": "credit",
+      "at": "2026-11-28T14:11:29.938187+00:00",
+      "data": {
+        "idempotency_key": "BR-0660:1",
+        "member_number": "GR-30700",
+        "stay_id": "BR-0660",
+        "points": 1500,
+        "correlation_id": "corr-03c4e9c8"
+      }
+    },
+    {
+      "id": "credit:L-0000198",
+      "kind": "credit",
+      "at": "2026-11-28T14:11:35.098471+00:00",
+      "data": {
+        "idempotency_key": "ML-0660:1",
+        "member_number": "GR-30701",
+        "stay_id": "ML-0660",
+        "points": 3020,
+        "correlation_id": "corr-54d834f2"
+      }
+    },
+    {
+      "id": "credit:L-0000199",
+      "kind": "credit",
+      "at": "2026-11-28T14:11:40.246353+00:00",
+      "data": {
+        "idempotency_key": "BR-0664:1",
+        "member_number": "GR-30708",
+        "stay_id": "BR-0664",
+        "points": 1580,
+        "correlation_id": "corr-5c53fea7"
+      }
+    },
+    {
+      "id": "credit:L-0000200",
+      "kind": "credit",
+      "at": "2026-11-28T14:11:45.389611+00:00",
+      "data": {
+        "idempotency_key": "ML-0664:1",
+        "member_number": "GR-30709",
+        "stay_id": "ML-0664",
+        "points": 3180,
+        "correlation_id": "corr-145c2152"
+      }
+    },
+    {
+      "id": "credit:L-0000201",
+      "kind": "credit",
+      "at": "2026-11-28T14:11:50.521050+00:00",
+      "data": {
+        "idempotency_key": "BR-0681:1",
+        "member_number": "GR-30727",
+        "stay_id": "BR-0681",
+        "points": 4560,
+        "correlation_id": "corr-d471911a"
+      }
+    },
+    {
+      "id": "credit:L-0000202",
+      "kind": "credit",
+      "at": "2026-11-28T14:12:00.713069+00:00",
+      "data": {
+        "idempotency_key": "BR-0680:1",
+        "member_number": "GR-30725",
+        "stay_id": "BR-0680",
+        "points": 1500,
+        "correlation_id": "corr-c0f5e41f"
+      }
+    },
+    {
+      "id": "credit:L-0000203",
+      "kind": "credit",
+      "at": "2026-11-28T14:12:05.787307+00:00",
+      "data": {
+        "idempotency_key": "BR-0683:1",
+        "member_number": "GR-30731",
+        "stay_id": "BR-0683",
+        "points": 4680,
+        "correlation_id": "corr-46e6da65"
+      }
+    },
+    {
+      "id": "credit:L-0000204",
+      "kind": "credit",
+      "at": "2026-11-28T14:12:20.455257+00:00",
+      "data": {
+        "idempotency_key": "BR-0682:1",
+        "member_number": "GR-30729",
+        "stay_id": "BR-0682",
+        "points": 1540,
+        "correlation_id": "corr-e55f02f2"
+      }
+    },
+    {
+      "id": "credit:L-0000205",
+      "kind": "credit",
+      "at": "2026-11-28T14:12:25.998667+00:00",
+      "data": {
+        "idempotency_key": "ML-0681:1",
+        "member_number": "GR-30728",
+        "stay_id": "ML-0681",
+        "points": 6120,
+        "correlation_id": "corr-6510c62b"
+      }
+    },
+    {
+      "id": "credit:L-0000206",
+      "kind": "credit",
+      "at": "2026-11-28T14:12:31.083763+00:00",
+      "data": {
+        "idempotency_key": "BR-0662:1",
+        "member_number": "GR-30704",
+        "stay_id": "BR-0662",
+        "points": 1540,
+        "correlation_id": "corr-6ac83331"
+      }
+    },
+    {
+      "id": "credit:L-0000207",
+      "kind": "credit",
+      "at": "2026-11-28T14:12:36.139892+00:00",
+      "data": {
+        "idempotency_key": "ML-0661:1",
+        "member_number": "GR-30703",
+        "stay_id": "ML-0661",
+        "points": 6120,
+        "correlation_id": "corr-1b6abc61"
+      }
+    },
+    {
+      "id": "credit:L-0000208",
+      "kind": "credit",
+      "at": "2026-11-28T14:12:41.200502+00:00",
+      "data": {
+        "idempotency_key": "ML-0680:1",
+        "member_number": "GR-30726",
+        "stay_id": "ML-0680",
+        "points": 3020,
+        "correlation_id": "corr-444efbcc"
+      }
+    },
+    {
+      "id": "event:stay.checked_out/0@83",
+      "kind": "event",
+      "at": "2026-11-28T14:11:30.529000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 0,
+        "offset": 83,
+        "key": "GR-30706",
+        "event_id": "2e738894-98b4-562f-953d-95e5b321b5f1",
+        "schema_version": "1",
+        "correlation_id": "corr-2e738894",
+        "stay_id": "BR-0663",
+        "member_number": "GR-30706",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:11:30.528000+00:00",
+        "occurred_minus_broker_seconds": -0.001,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/0@84",
+      "kind": "event",
+      "at": "2026-11-28T14:11:30.629000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 0,
+        "offset": 84,
+        "key": "GR-30707",
+        "event_id": "8d17c3e1-dc8c-548c-b37a-e8c25ff691f8",
+        "schema_version": "1",
+        "correlation_id": "corr-8d17c3e1",
+        "stay_id": "ML-0663",
+        "member_number": "GR-30707",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:11:30.628000+00:00",
+        "occurred_minus_broker_seconds": -0.001,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/0@85",
+      "kind": "event",
+      "at": "2026-11-28T14:11:31.029000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 0,
+        "offset": 85,
+        "key": "GR-30711",
+        "event_id": "f7b250ba-6b7a-5ce1-b159-604fbb8ce2d7",
+        "schema_version": "1",
+        "correlation_id": "corr-f7b250ba",
+        "stay_id": "ML-0665",
+        "member_number": "GR-30711",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:11:31.028000+00:00",
+        "occurred_minus_broker_seconds": -0.001,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/0@86",
+      "kind": "event",
+      "at": "2026-11-28T14:11:31.955000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 0,
+        "offset": 86,
+        "key": "GR-30728",
+        "event_id": "6510c62b-041d-5ecd-9279-a8ec78bf3177",
+        "schema_version": "1",
+        "correlation_id": "corr-6510c62b",
+        "stay_id": "ML-0681",
+        "member_number": "GR-30728",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:11:31.955000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/0@87",
+      "kind": "event",
+      "at": "2026-11-28T14:11:32.155000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 0,
+        "offset": 87,
+        "key": "GR-30729",
+        "event_id": "e55f02f2-00e3-54fd-a1e5-1e2853d41707",
+        "schema_version": "1",
+        "correlation_id": "corr-e55f02f2",
+        "stay_id": "BR-0682",
+        "member_number": "GR-30729",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:11:32.155000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/0@88",
+      "kind": "event",
+      "at": "2026-11-28T14:11:32.755000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 0,
+        "offset": 88,
+        "key": "GR-30732",
+        "event_id": "b1452145-44d1-5267-bf93-ea458ab796b5",
+        "schema_version": "1",
+        "correlation_id": "corr-b1452145",
+        "stay_id": "ML-0683",
+        "member_number": "GR-30732",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:11:32.755000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/0@89",
+      "kind": "event",
+      "at": "2026-11-28T14:11:32.955000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 0,
+        "offset": 89,
+        "key": "GR-30733",
+        "event_id": "02e20ddd-2d4f-549a-892c-f59d3aa43853",
+        "schema_version": "1",
+        "correlation_id": "corr-02e20ddd",
+        "stay_id": "BR-0684",
+        "member_number": "GR-30733",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:11:32.955000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/1@48",
+      "kind": "event",
+      "at": "2026-11-28T14:11:30.029000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 1,
+        "offset": 48,
+        "key": "GR-30701",
+        "event_id": "54d834f2-9d2e-5615-bc80-b364bca76170",
+        "schema_version": "1",
+        "correlation_id": "corr-54d834f2",
+        "stay_id": "ML-0660",
+        "member_number": "GR-30701",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:11:30.028000+00:00",
+        "occurred_minus_broker_seconds": -0.001,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/1@49",
+      "kind": "event",
+      "at": "2026-11-28T14:11:30.129000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 1,
+        "offset": 49,
+        "key": "GR-30702",
+        "event_id": "0e0fccbb-fa5c-5036-b255-cbedc91adb01",
+        "schema_version": "1",
+        "correlation_id": "corr-0e0fccbb",
+        "stay_id": "BR-0661",
+        "member_number": "GR-30702",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:11:30.128000+00:00",
+        "occurred_minus_broker_seconds": -0.001,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/1@50",
+      "kind": "event",
+      "at": "2026-11-28T14:11:30.329000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 1,
+        "offset": 50,
+        "key": "GR-30704",
+        "event_id": "6ac83331-97f9-5e59-810d-88619b126dbd",
+        "schema_version": "1",
+        "correlation_id": "corr-6ac83331",
+        "stay_id": "BR-0662",
+        "member_number": "GR-30704",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:11:30.328000+00:00",
+        "occurred_minus_broker_seconds": -0.001,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/1@51",
+      "kind": "event",
+      "at": "2026-11-28T14:11:30.429000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 1,
+        "offset": 51,
+        "key": "GR-30705",
+        "event_id": "dbeb729f-4bdd-54c4-bfe2-351310800bd7",
+        "schema_version": "1",
+        "correlation_id": "corr-dbeb729f",
+        "stay_id": "ML-0662",
+        "member_number": "GR-30705",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:11:30.428000+00:00",
+        "occurred_minus_broker_seconds": -0.001,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/1@52",
+      "kind": "event",
+      "at": "2026-11-28T14:11:30.829000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 1,
+        "offset": 52,
+        "key": "GR-30709",
+        "event_id": "145c2152-6864-58db-b357-b9ed549073d5",
+        "schema_version": "1",
+        "correlation_id": "corr-145c2152",
+        "stay_id": "ML-0664",
+        "member_number": "GR-30709",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:11:30.828000+00:00",
+        "occurred_minus_broker_seconds": -0.001,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/1@53",
+      "kind": "event",
+      "at": "2026-11-28T14:11:30.929000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 1,
+        "offset": 53,
+        "key": "GR-30710",
+        "event_id": "6c93a6b8-7c10-51d5-be6e-3e0ea8c6b7b2",
+        "schema_version": "1",
+        "correlation_id": "corr-6c93a6b8",
+        "stay_id": "BR-0665",
+        "member_number": "GR-30710",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:11:30.928000+00:00",
+        "occurred_minus_broker_seconds": -0.001,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/1@54",
+      "kind": "event",
+      "at": "2026-11-28T14:11:31.755000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 1,
+        "offset": 54,
+        "key": "GR-30727",
+        "event_id": "d471911a-8872-51b1-8553-68899c781272",
+        "schema_version": "1",
+        "correlation_id": "corr-d471911a",
+        "stay_id": "BR-0681",
+        "member_number": "GR-30727",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:11:31.755000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/1@55",
+      "kind": "event",
+      "at": "2026-11-28T14:11:33.155000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 1,
+        "offset": 55,
+        "key": "GR-30734",
+        "event_id": "2879f05d-4b84-5695-80e4-e42d8889ea4e",
+        "schema_version": "1",
+        "correlation_id": "corr-2879f05d",
+        "stay_id": "ML-0684",
+        "member_number": "GR-30734",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:11:33.155000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/2@61",
+      "kind": "event",
+      "at": "2026-11-28T14:11:29.928000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "offset": 61,
+        "key": "GR-30700",
+        "event_id": "03c4e9c8-9620-5bc9-a8b0-6b71856e8577",
+        "schema_version": "1",
+        "correlation_id": "corr-03c4e9c8",
+        "stay_id": "BR-0660",
+        "member_number": "GR-30700",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:11:29.928000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/2@62",
+      "kind": "event",
+      "at": "2026-11-28T14:11:30.229000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "offset": 62,
+        "key": "GR-30703",
+        "event_id": "1b6abc61-d379-5730-bd06-1a2b0eb502ec",
+        "schema_version": "1",
+        "correlation_id": "corr-1b6abc61",
+        "stay_id": "ML-0661",
+        "member_number": "GR-30703",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:11:30.228000+00:00",
+        "occurred_minus_broker_seconds": -0.001,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/2@63",
+      "kind": "event",
+      "at": "2026-11-28T14:11:30.729000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "offset": 63,
+        "key": "GR-30708",
+        "event_id": "5c53fea7-60de-5915-a9ec-6b62739da3a3",
+        "schema_version": "1",
+        "correlation_id": "corr-5c53fea7",
+        "stay_id": "BR-0664",
+        "member_number": "GR-30708",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:11:30.728000+00:00",
+        "occurred_minus_broker_seconds": -0.001,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/2@64",
+      "kind": "event",
+      "at": "2026-11-28T14:11:31.355000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "offset": 64,
+        "key": "GR-30725",
+        "event_id": "c0f5e41f-cf49-5a51-adbd-6c464b92d64d",
+        "schema_version": "1",
+        "correlation_id": "corr-c0f5e41f",
+        "stay_id": "BR-0680",
+        "member_number": "GR-30725",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:11:31.355000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/2@65",
+      "kind": "event",
+      "at": "2026-11-28T14:11:31.555000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "offset": 65,
+        "key": "GR-30726",
+        "event_id": "444efbcc-2c4d-51ff-8805-4ee0db7a466c",
+        "schema_version": "1",
+        "correlation_id": "corr-444efbcc",
+        "stay_id": "ML-0680",
+        "member_number": "GR-30726",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:11:31.555000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/2@66",
+      "kind": "event",
+      "at": "2026-11-28T14:11:32.355000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "offset": 66,
+        "key": "GR-30730",
+        "event_id": "87578313-8927-5cd3-a713-997a4130877c",
+        "schema_version": "1",
+        "correlation_id": "corr-87578313",
+        "stay_id": "ML-0682",
+        "member_number": "GR-30730",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:11:32.355000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/2@67",
+      "kind": "event",
+      "at": "2026-11-28T14:11:32.555000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "offset": 67,
+        "key": "GR-30731",
+        "event_id": "46e6da65-c532-5f06-880d-ef70e7501e8d",
+        "schema_version": "1",
+        "correlation_id": "corr-46e6da65",
+        "stay_id": "BR-0683",
+        "member_number": "GR-30731",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:11:32.555000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:points.posted/2@61",
+      "kind": "event",
+      "at": "2026-11-28T14:11:30.047000+00:00",
+      "data": {
+        "topic": "points.posted",
+        "partition": 2,
+        "offset": 61,
+        "key": "GR-30700",
+        "event_id": "869f9d3b-852e-4550-9707-6342b03c2b95",
+        "schema_version": "1",
+        "correlation_id": "corr-03c4e9c8",
+        "stay_id": "BR-0660",
+        "member_number": "GR-30700",
+        "revision": 1,
+        "occurred_at": null,
+        "decoded": true
+      }
+    },
+    {
+      "id": "lag:posting-service/stay.checked_out/0@20261128T141248",
+      "kind": "lag",
+      "at": "2026-11-28T14:12:48.701062+00:00",
+      "data": {
+        "group": "posting-service",
+        "topic": "stay.checked_out",
+        "partition": 0,
+        "committed": 90,
+        "low": 0,
+        "high": 90,
+        "lag": 0
+      }
+    },
+    {
+      "id": "lag:posting-service/stay.checked_out/1@20261128T141248",
+      "kind": "lag",
+      "at": "2026-11-28T14:12:48.701062+00:00",
+      "data": {
+        "group": "posting-service",
+        "topic": "stay.checked_out",
+        "partition": 1,
+        "committed": 56,
+        "low": 0,
+        "high": 56,
+        "lag": 0
+      }
+    },
+    {
+      "id": "lag:posting-service/stay.checked_out/2@20261128T141248",
+      "kind": "lag",
+      "at": "2026-11-28T14:12:48.701062+00:00",
+      "data": {
+        "group": "posting-service",
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "committed": 68,
+        "low": 0,
+        "high": 68,
+        "lag": 0
+      }
+    }
+  ]
+}

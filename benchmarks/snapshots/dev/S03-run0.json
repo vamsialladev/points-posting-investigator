@@ -1,0 +1,166 @@
+{
+  "scenario_run": "S03-run0",
+  "taken_at": "2026-11-28T14:09:04.251328+00:00",
+  "since": "2026-11-28T14:08:47+00:00",
+  "truncated": [],
+  "items": [
+    {
+      "id": "parked:1",
+      "kind": "parked",
+      "at": "2026-11-28T14:09:03.994528+00:00",
+      "data": {
+        "event_id": "058835b7-f77e-5c50-b0e4-595d7b6f5ac4",
+        "member_number": "GR-30100",
+        "stay_id": "BR-0180",
+        "revision": 1,
+        "source_topic": "stay.checked_out",
+        "source_partition": 2,
+        "source_offset": 0,
+        "status": "pending",
+        "attempts": 0,
+        "transient_failures": 1,
+        "error_class": "ledger_timeout_not_found",
+        "last_error": "timeout_not_found",
+        "correlation_id": "corr-058835b7",
+        "first_failed_at": "2026-11-28T14:09:03.994528+00:00",
+        "last_failed_at": "2026-11-28T14:09:03.994528+00:00",
+        "done_at": null,
+        "dead_at": null
+      }
+    },
+    {
+      "id": "credit:L-0000001",
+      "kind": "credit",
+      "at": "2026-11-28T14:08:55.979088+00:00",
+      "data": {
+        "idempotency_key": "BR-0180:1",
+        "member_number": "GR-30100",
+        "stay_id": "BR-0180",
+        "points": 1500,
+        "correlation_id": "corr-058835b7"
+      }
+    },
+    {
+      "id": "event:stay.checked_out/1@0",
+      "kind": "event",
+      "at": "2026-11-28T14:08:48.907000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 1,
+        "offset": 0,
+        "key": "GR-30102",
+        "event_id": "92a555da-f4a0-5881-9d69-a66d138e5a38",
+        "schema_version": "1",
+        "correlation_id": "corr-92a555da",
+        "stay_id": "BR-0181",
+        "member_number": "GR-30102",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:08:48.907000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/1@1",
+      "kind": "event",
+      "at": "2026-11-28T14:08:49.407000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 1,
+        "offset": 1,
+        "key": "GR-30103",
+        "event_id": "72dc9e82-8b24-5c12-bb1c-9f2535d85c54",
+        "schema_version": "1",
+        "correlation_id": "corr-72dc9e82",
+        "stay_id": "ML-0181",
+        "member_number": "GR-30103",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:08:49.407000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/2@0",
+      "kind": "event",
+      "at": "2026-11-28T14:08:47.936000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "offset": 0,
+        "key": "GR-30100",
+        "event_id": "058835b7-f77e-5c50-b0e4-595d7b6f5ac4",
+        "schema_version": "1",
+        "correlation_id": "corr-058835b7",
+        "stay_id": "BR-0180",
+        "member_number": "GR-30100",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:08:47.907000+00:00",
+        "occurred_minus_broker_seconds": -0.029,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/2@1",
+      "kind": "event",
+      "at": "2026-11-28T14:08:48.407000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "offset": 1,
+        "key": "GR-30101",
+        "event_id": "56502e3a-9462-5933-b16b-c7aedd1bb94d",
+        "schema_version": "1",
+        "correlation_id": "corr-56502e3a",
+        "stay_id": "ML-0180",
+        "member_number": "GR-30101",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:08:48.407000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "lag:posting-service/stay.checked_out/0@20261128T140904",
+      "kind": "lag",
+      "at": "2026-11-28T14:09:04.500020+00:00",
+      "data": {
+        "group": "posting-service",
+        "topic": "stay.checked_out",
+        "partition": 0,
+        "committed": null,
+        "low": 0,
+        "high": 0,
+        "lag": 0
+      }
+    },
+    {
+      "id": "lag:posting-service/stay.checked_out/1@20261128T140904",
+      "kind": "lag",
+      "at": "2026-11-28T14:09:04.500020+00:00",
+      "data": {
+        "group": "posting-service",
+        "topic": "stay.checked_out",
+        "partition": 1,
+        "committed": null,
+        "low": 0,
+        "high": 2,
+        "lag": 2
+      }
+    },
+    {
+      "id": "lag:posting-service/stay.checked_out/2@20261128T140904",
+      "kind": "lag",
+      "at": "2026-11-28T14:09:04.500020+00:00",
+      "data": {
+        "group": "posting-service",
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "committed": 1,
+        "low": 0,
+        "high": 2,
+        "lag": 1
+      }
+    }
+  ]
+}

@@ -117,6 +117,8 @@ All notable changes to this project are documented here. The format follows
     as `investigator` and shows an event's own time next to the broker's; `python -m app.evidence.snapshot`
   - every scenario test takes an evidence snapshot after its trigger; both workflows upload them
   - a test reads S13's clock skew from the topic
+  - the 18 dev incidents' snapshots (run 0, from GitHub Actions) in `benchmarks/snapshots/dev/`, with offline
+    tests that each is complete, holds one incident only, and has its catalog entry's stored evidence
 
 ### Changed
 - CI's `checks` job fetches the full history, so the pre-registration order test can read it.

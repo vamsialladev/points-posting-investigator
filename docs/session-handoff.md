@@ -100,7 +100,11 @@ Already approved:
 - **State of the order of work (2026-11-28):** step 1 is built (ADR-0022). Step 2's capture is built: every
   scenario test takes a snapshot after its trigger into `.scenario-runs/evidence/<scenario>-run<n>.json`, and the
   required job (artifact `scenario-evidence-<run id>`) and the batch (artifact `scenario-batch-<run id>`) upload
-  them. Still to do: download both artifacts from a green run on `main`, commit the 18 as fixtures, then step 3.
+  them. **The 18 dev fixtures are committed** (`benchmarks/snapshots/dev/`, PR #20, from runs 46153042740 and
+  46153042751): run 0 on a new stack, S15 pair A. To refresh them: download both artifacts of one green pair of
+  runs, copy the `*-run0.json` files unedited, run `tests/test_dev_snapshots.py`. Then step 3.
+- **Two triggers changed after the catalog audit** (S06 waits until every event posts; S10 waits 12 s). The
+  catalog did not change.
 - **S13's skew is now tested from the topic** (`test_s13_the_skew_shows_on_the_topic_and_only_there`).
 
 ## Phase 2, piece by piece

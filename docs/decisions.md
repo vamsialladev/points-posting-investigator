@@ -709,15 +709,21 @@ this decision. Updates are added as dated bullets; nothing is rewritten.
   - **Text someone else wrote** (log messages, error text, correlation IDs, questions, runbook text) is listed in
     `model.UNTRUSTED` and cut to 300 characters. It is a value, never an instruction.
   - **Snapshots:** the scenario tests take one after every trigger, as these logins, and the workflows upload them.
-    The 18 dev snapshots are then committed as fixtures (the next PR), so the rules and the mock evaluation run
-    offline.
+    The 18 dev snapshots are committed as fixtures (`benchmarks/snapshots/dev/`, read with `app/evidence/dev.py`),
+    so the rules and the mock evaluation run offline.
+  - **A dev incident is run 0 on a new stack** (`SCENARIO_DEV_RUNS=1` in the workflows), the catalog's default,
+    and for S15 pair A. Pair B first appears in M9's dataset. The scenario tests wait 5 s after each reset and
+    open the evidence window on a whole second, so a snapshot holds one incident only; an offline test fails if a
+    fixture names a member from another scenario's block or lacks its catalog entry's stored evidence.
 - **Tradeoff:**
   - **One password for three roles.** Simpler to hand to one process; a leak exposes all three read paths. They
     are read-only and the data is synthetic.
   - **Column-level grants mean `SELECT *` on `parked_event` fails** for the reader. Intended; a new column must be
     added to the readable list on purpose.
-  - **A snapshot is a point in time.** The window is "since just before the trigger", so on a shared stack it can
-    hold another scenario's rows. The rules must work from what a real investigator would see, so this is kept.
+  - **A snapshot is a point in time,** taken when the trigger's last step ends. Two triggers ended before their
+    evidence existed and were given a wait (S06, S10; verification log M3 Phase 3 #9 and #10).
+  - **The dev incidents are clean by construction:** one scenario at a time, with a settle wait. Background noise
+    and overlapping incidents are M9's variants, not these.
   - **Reading a topic from the start is bounded by a message limit,** so on a long-lived stack the oldest messages
     are left out and reported as such.
 - **Result:** `tests/test_evidence_unit.py`, `tests/test_db_offline.py` (offline); `tests/test_evidence_postgres.py`,

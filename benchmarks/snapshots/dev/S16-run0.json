@@ -1,0 +1,60 @@
+{
+  "scenario_run": "S16-run0",
+  "taken_at": "2026-11-28T14:14:31.905863+00:00",
+  "since": "2026-11-28T14:14:31+00:00",
+  "truncated": [],
+  "items": [
+    {
+      "id": "question:1",
+      "kind": "question",
+      "at": "2026-11-28T14:14:31.903664+00:00",
+      "data": {
+        "member_number": "GR-30750",
+        "stay_id": "BR-0700",
+        "question": "Where are my points for this stay?"
+      }
+    },
+    {
+      "id": "lag:posting-service/stay.checked_out/0@20261128T141432",
+      "kind": "lag",
+      "at": "2026-11-28T14:14:32.098918+00:00",
+      "data": {
+        "group": "posting-service",
+        "topic": "stay.checked_out",
+        "partition": 0,
+        "committed": 19,
+        "low": 0,
+        "high": 19,
+        "lag": 0
+      }
+    },
+    {
+      "id": "lag:posting-service/stay.checked_out/1@20261128T141432",
+      "kind": "lag",
+      "at": "2026-11-28T14:14:32.098918+00:00",
+      "data": {
+        "group": "posting-service",
+        "topic": "stay.checked_out",
+        "partition": 1,
+        "committed": 17,
+        "low": 0,
+        "high": 17,
+        "lag": 0
+      }
+    },
+    {
+      "id": "lag:posting-service/stay.checked_out/2@20261128T141432",
+      "kind": "lag",
+      "at": "2026-11-28T14:14:32.098918+00:00",
+      "data": {
+        "group": "posting-service",
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "committed": 21,
+        "low": 0,
+        "high": 21,
+        "lag": 0
+      }
+    }
+  ]
+}

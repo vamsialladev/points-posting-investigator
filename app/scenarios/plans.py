@@ -227,6 +227,10 @@ def _s06(b: Block) -> Built:
             Wait(1.0, "events are flowing"),
             Compose("restart", ("posting",)),
             JoinSends(),
+            # The incident is the whole restart. Without this wait the trigger ended while the service was still
+            # starting, and the evidence read next sometimes had no "started" line yet (verification log M3 Phase
+            # 3 #9). Every event posting means the service is back and has its partitions.
+            posted(events),
         ),
         settle=(*quiet(), posted(events)),
         events=events,
@@ -283,6 +287,10 @@ def _s10(b: Block) -> Built:
             # 300 s: in the compound pair A these events post through a rate-limited ledger first (59 s and 89 s in
             # the first two batch runs; the default 120 s was too close).
             WaitFor("outbox_unpublished", at_least=len(events), timeout_seconds=300),
+            # The catalog's evidence is unpublished rows "with rising age", and the `outbox_backlog` alert needs
+            # 10 s of it. Without this wait the oldest row was 1.8 s old when the evidence was read, which a relay
+            # that is merely a moment behind also shows (verification log M3 Phase 3 #10).
+            Wait(12.0, "the unpublished rows age past the alert rule's 10 s"),
         ),
         restore=(Compose("start", ("relay",)),),
         settle=quiet(),

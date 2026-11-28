@@ -9,13 +9,19 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import UTC, datetime, timedelta
+import time
+from datetime import UTC, datetime
 
 import pytest
 
 from app.scenarios import catalog, plans, run
 
-RUNS_FOR_TESTS = range(plans.MAX_RUN, 5, -1)  # the top of the range; demo runs count up from 0
+# Locally the tests use the top of the range, because demo runs count up from 0. On a new stack in GitHub Actions
+# (SCENARIO_DEV_RUNS=1) they count up from 0, so each scenario's first trigger is its dev incident: the catalog's
+# default run, the only one an arm may see before M9 (docs/benchmark-protocol.md, section 4).
+DEV_RUNS = os.environ.get("SCENARIO_DEV_RUNS") == "1"
+RUNS_FOR_TESTS = range(0, plans.MAX_RUN + 1) if DEV_RUNS else range(plans.MAX_RUN, 5, -1)
+SETTLE_SECONDS = 5.0  # between one scenario's reset and the next one's evidence window
 MAPPING = {
     "DATABASE_URL": "TEST_DATABASE_URL",
     "KAFKA_BOOTSTRAP_SERVERS": "TEST_KAFKA_BOOTSTRAP_SERVERS",
@@ -74,8 +80,15 @@ def capture(evidence_readers, name: str, since: datetime):
 
 
 def started() -> datetime:
-    """A moment just before a trigger: the start of the window its evidence is read from."""
-    return datetime.now(UTC) - timedelta(seconds=5)
+    """The start of the window a trigger's evidence is read from: now, after a settle wait.
+
+    The scenario before can still be finishing when its reset returns: S11's dead letter reached the topic 0.2 s
+    after S13's window had opened, and S13's last posting landed inside S16's (verification log M3 Phase 3 #4 and
+    #7). So wait first, then open the window. The stack's clocks are this host's. The start is cut to the whole
+    second, because a broker timestamp has whole milliseconds: with the exact time, S05's first event (sent at once)
+    was stamped 0.2 ms "before" its own window and was left out (#8)."""
+    time.sleep(SETTLE_SECONDS)
+    return datetime.now(UTC).replace(microsecond=0)
 
 
 def rows(effects, base: str, query: str, params: tuple = ()) -> list[tuple]:
