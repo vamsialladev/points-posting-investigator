@@ -117,8 +117,9 @@ set differs from the entry's.
 - **Expected behaviour:** uncommitted events are redelivered; the ledger returns the same entry for the same key;
   nothing is lost and nothing is credited twice.
 - **Root cause:** `consumer_restart`
-- **Evidence:** a gap in `posted_at`; the posting service's counters start again from zero; a start-up line in
-  the stored logs; duplicate outcomes right after the restart.
+- **Evidence:** a "posting service started" line in the stored logs during the incident, followed by a
+  "partitions assigned" line; a gap in `posted_at`; the posting service's counters start again from zero.
+  Sometimes, not always: duplicate outcomes right after the restart.
 - **Recovery:** `none`
 - **Affected members:** none lost; postings in the window are a few seconds late.
 - **Reset:** `reset S06`
@@ -223,8 +224,10 @@ set differs from the entry's.
 - **Expected behaviour:** partitions move again and again; some events are redelivered; nothing is lost and nothing
   is credited twice; posting is slow while it lasts.
 - **Root cause:** `rebalance_storm`
-- **Evidence:** lag rising and falling in steps; `posting_offset_commit_failures_total` rising; duplicate outcomes;
-  rebalance lines in the stored logs; no ledger errors.
+- **Evidence:** many "partitions revoked" and "partitions assigned" lines from the posting service within a short
+  time, in the stored logs; postings slow while it lasts; no ledger errors and nothing parked. Sometimes, not
+  always: duplicate outcomes, and "offset commit failed" lines with `posting_offset_commit_failures_total` rising.
+  Lag rises and falls while it lasts, but lag is read live and isn't stored.
 - **Recovery:** `none`. An operator removes the flapping consumer.
 - **Affected members:** none lost; postings are late.
 - **Reset:** `reset S14`
