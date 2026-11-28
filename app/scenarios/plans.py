@@ -227,6 +227,10 @@ def _s06(b: Block) -> Built:
             Wait(1.0, "events are flowing"),
             Compose("restart", ("posting",)),
             JoinSends(),
+            # The incident is the whole restart. Without this wait the trigger ended while the service was still
+            # starting, and the evidence read next sometimes had no "started" line yet (verification log M3 Phase
+            # 3 #9). Every event posting means the service is back and has its partitions.
+            posted(events),
         ),
         settle=(*quiet(), posted(events)),
         events=events,
