@@ -1,4 +1,4 @@
-"""Who each process is to Kafka, and what each identity may do (RFC-0002 Phase 2, ADR-0020). Pure: no I/O here.
+"""Who each process is to Kafka, and what each identity may do (RFC-0002 Phase 2, ADR-0021). Pure: no I/O here.
 
 - `client_config(principal, bootstrap)` is the one place a Kafka client's connection settings are built. With that
   principal's password in the environment the client logs in with SASL/PLAIN; without it the settings are plain

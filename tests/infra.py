@@ -67,7 +67,7 @@ def registry() -> SchemaRegistryClient:
 
 def admin_kafka(bootstrap: str) -> dict[str, object]:
     """Connection settings for a test's own Kafka client: the broker's admin, which may use any scratch topic and
-    group (ADR-0020). Plain settings when the stack has no SASL."""
+    group (ADR-0021). Plain settings when the stack has no SASL."""
     return kafka_auth.client_config(kafka_auth.ADMIN, bootstrap)
 
 

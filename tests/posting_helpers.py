@@ -60,7 +60,7 @@ def ledger_server(engine: Engine, token: str) -> Iterator[str]:
 
 def checkout_producer(kafka: str, registry: SchemaRegistryClient, topic: str) -> CheckoutProducer:
     # The real delivery settings (ADR-0017): a test whose events weren't all delivered fails at the send, loudly.
-    # As the broker's admin: the producer's own identity may write the real checkout topic only (ADR-0020).
+    # As the broker's admin: the producer's own identity may write the real checkout topic only (ADR-0021).
     producer = make_checkout_producer(kafka, principal=kafka_auth.ADMIN)
     return CheckoutProducer(producer, registry, topic, schema=schemas.latest(topics.CHECKED_OUT))
 

@@ -47,8 +47,8 @@ def test_every_service_that_logs_gets_the_ops_password_and_no_setting_spans_two_
     for service, definition in SERVICES.items():
         for name, value in definition.get("environment", {}).items():
             assert "\n" not in str(value), f"{service}.{name} contains a line break"
-            if ":?" in str(value):
-                assert str(value).endswith("}"), f"{service}.{name}: the required-setting message is cut off"
+            # Every ${NAME:?message} is closed: a message cut off by a broken line leaves one open.
+            assert str(value).count("${") == str(value).count("}"), f"{service}.{name}: a ${{...}} is cut off"
 
 
 def test_the_scenario_overridable_setting_reaches_the_two_services_that_read_it():

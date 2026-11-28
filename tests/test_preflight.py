@@ -10,6 +10,7 @@ import pytest
 from dotenv import dotenv_values
 
 from app import preflight
+from app.pipeline import kafka_auth
 from app.preflight import PROFILES, VARS, build_report, load_settings, main
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -30,6 +31,7 @@ FAKE = {
     "POSTING_DB_PASSWORD": "fake-posting-db-pw-3302",
     "RELAY_DB_PASSWORD": "fake-relay-db-pw-3303",
     "OPS_DB_PASSWORD": "fake-ops-db-pw-3304",
+    **{name: f"fake-kafka-login-{n:02d}" for n, name in enumerate(kafka_auth.PASSWORD_VARIABLES)},
     "KAFKA_BOOTSTRAP_SERVERS": "localhost:9092",
     "SCHEMA_REGISTRY_URL": "http://localhost:8081",
     "LEDGER_API_URL": "http://localhost:8020",
@@ -139,6 +141,7 @@ def test_template_with_generated_local_values_is_ready_for_core(tmp_path):
         "POSTING_DB_PASSWORD": "o" * 24,
         "RELAY_DB_PASSWORD": "r" * 24,
         "OPS_DB_PASSWORD": "p" * 24,
+        **{name: "k" * 24 for name in kafka_auth.PASSWORD_VARIABLES},
         "LEDGER_API_TOKEN": "t" * 24,
     }
     lines = []

@@ -32,7 +32,7 @@ SCAN_TIMEOUT_SECONDS = 30.0
 def build(bootstrap: str, registry_url: str, posting_group: str) -> Kafka:
     bootstrap = bootstrap.replace("localhost", "127.0.0.1")
     registry = SchemaRegistryClient({"url": registry_url.replace("://localhost", "://127.0.0.1"), "timeout": 10})
-    # The scenario tool breaks the local stack on purpose, so it acts as the broker's admin (ADR-0020).
+    # The scenario tool breaks the local stack on purpose, so it acts as the broker's admin (ADR-0021).
     base = kafka_auth.client_config(kafka_auth.ADMIN, bootstrap)
     checkout = CheckoutProducer(make_checkout_producer(bootstrap, principal=kafka_auth.ADMIN), registry)
     serializer = AvroSerializer(registry, schemas.latest(topics.CHECKED_OUT))

@@ -87,7 +87,7 @@ def make_relay(
     serializer = AvroPayloadSerializer(registry, {topic: schemas.latest(topics.POINTS_POSTED)})
     return Relay(
         OutboxStore(engine),
-        make_producer(kafka, cfg.delivery_timeout, principal=kafka_auth.ADMIN),  # scratch topics (ADR-0020)
+        make_producer(kafka, cfg.delivery_timeout, principal=kafka_auth.ADMIN),  # scratch topics (ADR-0021)
         serializer,
         cfg,
         metrics=RelayMetrics(),
