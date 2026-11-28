@@ -2,7 +2,8 @@
 
 **Updated:** 2026-11-28 (UTC). **RFC-0002 Phase 1 is done and Phase 2 is done except Kafka SASL and ACLs.** All 18
 scenarios trigger and reset on a real stack in GitHub Actions (6 in the required CI job, 12 in the "Scenario batch"
-workflow). Merged: PRs #11 to #16. Open: #17 (Kafka logins and the access list). Milestone 2
+workflow), and Kafka asks every client for a login with a broker-enforced access list. Merged: PRs #11 to #17.
+Open: #18 (rebalance log lines, catalog corrections, and the S07 diagnosis below). Milestone 2
 is complete. The owner's "Milestone 3" (a read-only AI investigator plus human-approved replay) runs as the phases of
 `docs/rfcs/RFC-0002-investigator-and-approved-replay.md` across spec M3, M6 and M7 (ADR-0019).
 
@@ -57,6 +58,21 @@ Already approved:
 
 **Before Phase 3's first commit,** any correction to a pre-registered file needs
 `uv run python scripts/prereg_lock.py --write` in the same commit. After it, those files don't change.
+
+## Open problem: S07's stored evidence (settle this before the freeze)
+- **What is known:** in batch run 46094551526 the posting service stored **no** "retrying … in place after
+  DatabaseFailure" line 14 s into a database outage, in the one run where no event was mid-flight when the login
+  was cut. In the three runs where the check passed, one event was mid-flight, and its failed write logs at once.
+- **What is not known:** whether a read-stage failure logs late (a slow failed connection attempt) or never. By
+  the code it should log at once (`PostingStore._exists` raises `DatabaseFailure`; `PostingConsumer.run_once` logs
+  the retry). The run disagrees.
+- **What is in place to find out (PR #18):** the S07 test waits up to 45 s for the line and prints every stored
+  posting line of the last 90 s, pass or fail; the workflow keeps 3,000 stack-log lines. Read the S07 block in the
+  next batch outputs.
+- **Then:** if the line comes late, keep the bounded wait and say so in the catalog entry (new lock). If it never
+  comes, find why the consumer isn't reaching the retry path (blocked in a connection attempt? idle?), fix the
+  service, and correct the entry. Either way record it in the verification log; don't mark S07's evidence as
+  confirmed before that. The wait going from 14 s to 45 s loosens one assertion: tell the owner.
 
 ## Next: Phase 3, and what to settle before its first commit freezes the pre-registration
 - **Every catalog evidence line was audited against the code** (verification log M3 Phase 2 #14l). S07, S13, S14
