@@ -54,6 +54,7 @@ markers = [
     "postgres: needs a real PostgreSQL (TEST_DATABASE_URL); skipped with the reason if absent, a failure under REQUIRE_MARKERS",
     "kafka: needs a real Kafka broker (TEST_KAFKA_BOOTSTRAP_SERVERS); skipped with the reason if absent, a failure under REQUIRE_MARKERS",
     "chaos: stops and restarts a stack container (Kafka) to test an outage; always also marked kafka",
+    "batch: the slow failure scenarios on the real stack (restarts, outages, a rebalance storm); always also marked postgres and kafka; run by scripts/run_integration.py --batch and the Scenario batch workflow",
     "browser: drives Chromium with Playwright; skipped with the reason if absent, a failure under REQUIRE_MARKERS",
 ]
 

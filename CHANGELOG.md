@@ -105,6 +105,8 @@ All notable changes to this project are documented here. The format follows
   - `python -m app.scenarios trigger|reset` and `scripts\scenario.ps1`, local stack only, with a manifest per run
     in `.scenario-runs/`
   - `LEDGER_TIMEOUT_SECONDS` on the posting service and the retry worker (5 s by default)
+- The "Scenario batch" workflow (GitHub Actions, not a required check): the 12 slow scenarios triggered, checked
+  and reset on a real stack (`tests/test_scenarios_batch.py`, `scripts\test_integration.ps1 --batch`).
 
 ### Changed
 - CI's `checks` job fetches the full history, so the pre-registration order test can read it.

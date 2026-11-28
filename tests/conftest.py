@@ -8,3 +8,4 @@ from tests.required_markers import (  # noqa: F401 (pytest finds hooks by name)
     pytest_runtest_makereport,
     pytest_sessionfinish,
 )
+from tests.scenario_helpers import effects  # noqa: F401 (pytest finds fixtures by name)

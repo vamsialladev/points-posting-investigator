@@ -41,7 +41,12 @@ def main(argv: list[str]) -> int:
     for name, value in FIXED.items():
         env.setdefault(name, value)
     env["REQUIRE_MARKERS"] = "postgres,kafka"
-    command = [sys.executable, "-m", "pytest", "-m", "postgres or kafka", "-rs", "-p", "no:cacheprovider", *argv]
+    # `--batch` runs only the slow scenario batch (tests/test_scenarios_batch.py); without it the batch is left out,
+    # so the required CI job stays fast. Either way a skipped or missing postgres/kafka test is a failure.
+    batch = "--batch" in argv
+    argv = [arg for arg in argv if arg != "--batch"]
+    selection = "batch" if batch else "(postgres or kafka) and not batch"
+    command = [sys.executable, "-m", "pytest", "-m", selection, "-rs", "-p", "no:cacheprovider", *argv]
     return subprocess.run(command, cwd=ROOT, env=env, check=False).returncode  # noqa: S603 (fixed command)
 
 

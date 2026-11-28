@@ -64,3 +64,33 @@ def test_every_port_binds_to_loopback_only():
     for service, definition in SERVICES.items():
         for port in definition.get("ports", []):
             assert str(port).startswith("127.0.0.1:"), f"{service} publishes {port} beyond this machine"
+
+
+def test_every_workflow_parses_pins_its_actions_and_asks_for_read_only_rights():
+    import re
+
+    workflows = sorted((ROOT / ".github" / "workflows").glob("*.yml"))
+    assert {path.name for path in workflows} >= {"ci.yml", "scenario-batch.yml"}
+    for path in workflows:
+        text = path.read_text(encoding="utf-8")
+        document = yaml.safe_load(text)
+        assert document["permissions"] == {"contents": "read"}, path.name
+        uses = re.findall(r"uses: (\S+)", text)
+        assert uses, path.name
+        for action in uses:
+            assert re.fullmatch(r"[\w./-]+@[0-9a-f]{40}", action), f"{path.name}: {action} is not pinned to a commit"
+        for job in document["jobs"].values():
+            assert job["timeout-minutes"] <= 45, path.name
+
+
+def test_the_batch_workflow_gives_the_stack_every_value_the_required_job_gives_it():
+    """The two jobs start the same stack, so they must generate the same throwaway settings."""
+
+    def generated(name: str) -> set[str]:
+        text = (ROOT / ".github" / "workflows" / name).read_text(encoding="utf-8")
+        lines = [line for line in text.splitlines() if line.strip().startswith("for name in ")]
+        assert lines, name
+        return {frozenset(line.split(" in ", 1)[1].split(";")[0].split()) for line in lines}
+
+    assert generated("scenario-batch.yml") <= generated("ci.yml")
+    assert set(PASSWORD_VARIABLES) <= next(iter(generated("scenario-batch.yml")))

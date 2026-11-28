@@ -280,7 +280,9 @@ def _s10(b: Block) -> Built:
         trigger=(
             Compose("stop", ("relay",)),
             SendEvents(events, rate=5),
-            WaitFor("outbox_unpublished", at_least=len(events)),
+            # 300 s: in the compound pair A these events post through a rate-limited ledger first (59 s and 89 s in
+            # the first two batch runs; the default 120 s was too close).
+            WaitFor("outbox_unpublished", at_least=len(events), timeout_seconds=300),
         ),
         restore=(Compose("start", ("relay",)),),
         settle=quiet(),

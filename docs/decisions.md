@@ -596,3 +596,34 @@ this decision. Updates are added as dated bullets; nothing is rewritten.
 - **What would change this decision:** a scenario that needs an unknown member (then the `members` table comes
   back); SASL proving unreliable on Docker Desktop (then a documented code-level check, with the owner's OK); the
   owner wanting the web approval screen before replay (then M8's sign-in moves ahead of Phase 5).
+
+## ADR-0020: The slow scenarios run on a real stack in GitHub Actions, as a workflow that is not a required check
+- **Context:** 12 of the 18 scenarios restart containers, cut a database role's login or flap a consumer group, and
+  take about five minutes together. The plan was a batch on the owner's laptop. The laptop is shared with other
+  stages' paid benchmarks, and the owner's standing order (2026-11-27) is to run real-stack and Docker work in CI
+  wherever possible. CI already starts the same stack for the required real-stack job.
+- **Options considered:**
+  1. Run the batch on the laptop when it is free.
+  2. Add the 12 scenarios to the required "Real Kafka, Karapace and Postgres" job.
+  3. A separate workflow, triggered when scenario, pipeline, compose or migration files change and on demand, not
+     required for merging.
+- **Decision:** option 3.
+  - `tests/test_scenarios_batch.py`, marked `batch` (and `postgres`, `kafka`, so a skip is still a failure).
+  - `scripts/run_integration.py` leaves `batch` out by default and selects only it with `--batch`.
+  - `.github/workflows/scenario-batch.yml` starts the stack with throwaway values, runs the batch, and uploads the
+    run manifests and the stack logs as an artifact for 30 days.
+  - The six fast scenarios stay in the required job.
+  - A pull request that changes scenario code is merged only after its batch run is green, by the builder's own
+    rule: auto-merge goes on after that run, since the protection doesn't wait for it.
+- **Tradeoff:**
+  - **Not required, so it can be skipped by mistake.** A change outside the listed paths that breaks a slow
+    scenario is caught only at the next batch run.
+  - **GitHub's runners are not the owner's machine.** Timing differs (verification log M3 #7 is one case where a
+    faster runner found a race the laptop hid), so waits tuned here may be tight elsewhere.
+  - **Evidence lives in two places:** the test output is copied into `docs/evidence/`; the manifests and stack logs
+    are in the run's artifact and expire after 30 days.
+  - **Making it required** would add about six minutes to every pull request and a new required check to the
+    branch protection (ADR-0013).
+- **Result:** verification log, M3 Phase 2 (#13 onwards); `docs/evidence/m3-scenario-batch-ci-run-*.txt`.
+- **What would change this decision:** a slow scenario breaking unnoticed (then make the workflow required, or run
+  it nightly), or the batch growing past the job's 45-minute limit (then split it).
