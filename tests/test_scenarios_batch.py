@@ -108,14 +108,30 @@ def test_s06_a_posting_restart_mid_stream_loses_nothing_and_credits_nothing_twic
     assert started[0][0] >= 1, "the restart left a start-up line in the stored logs"
 
 
-def test_s07_a_posting_database_outage_leaves_credits_without_postings_until_it_is_back(effects):
+def test_s07_a_posting_database_outage_makes_partitions_wait_and_nothing_is_lost(effects):
+    """The first version asserted "the ledger credited a stay with no posting row yet". It passed twice and failed
+    the third time: the service reads its database before the ledger call, so that state exists only for an event
+    caught mid-flight when the login is cut (at most one per partition, often none). It is now counted and bounded,
+    and the checks below are the ones that always hold (verification log, M3 Phase 2)."""
+    partitions = 3
     with triggered(effects, "S07") as built:
         events = built.manifest.events
         posted, credited = posted_ids(effects, events), credits_for(effects, events)
         assert len(posted) < len(events), "some events could not be posted while the role could not log in"
-        missing = [e for e in events if e.event_id not in posted and f"{e.stay_id}:1" in credited]
-        assert missing, "the ledger credited at least one stay whose posting row could not be written yet"
+        assert effects.count("lag") >= 1, "the partitions wait: the group falls behind"
         assert parked(effects, events) == [], "a database failure is not parked: the partition waits"
+        in_flight = [e for e in events if e.event_id not in posted and f"{e.stay_id}:1" in credited]
+        print(f"S07: {len(posted)}/{len(events)} posted, {len(in_flight)} credited without a posting row yet")
+        assert len(in_flight) <= partitions, "at most one event per partition was past its reads when the cut came"
+        assert len(credited) <= len(posted) + partitions, "no event was credited after the database went away"
+        retries = rows(
+            effects,
+            "ops",
+            "SELECT count(*) FROM log_event WHERE service = 'posting' AND level = 'WARNING'"
+            " AND message LIKE %s AND logged_at > now() - interval '2 minutes'",
+            ("retrying %in place after DatabaseFailure%",),
+        )
+        assert retries[0][0] >= 1, "the outage left retry lines in the stored logs"
     assert_all_posted_and_credited_once(effects, built.manifest.events)
 
 
