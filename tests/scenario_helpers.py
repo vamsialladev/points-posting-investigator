@@ -15,7 +15,11 @@ import pytest
 
 from app.scenarios import catalog, plans, run
 
-RUNS_FOR_TESTS = range(plans.MAX_RUN, 5, -1)  # the top of the range; demo runs count up from 0
+# Locally the tests use the top of the range, because demo runs count up from 0. On a new stack in GitHub Actions
+# (SCENARIO_DEV_RUNS=1) they count up from 0, so each scenario's first trigger is its dev incident: the catalog's
+# default run, the only one an arm may see before M9 (docs/benchmark-protocol.md, section 4).
+DEV_RUNS = os.environ.get("SCENARIO_DEV_RUNS") == "1"
+RUNS_FOR_TESTS = range(0, plans.MAX_RUN + 1) if DEV_RUNS else range(plans.MAX_RUN, 5, -1)
 MAPPING = {
     "DATABASE_URL": "TEST_DATABASE_URL",
     "KAFKA_BOOTSTRAP_SERVERS": "TEST_KAFKA_BOOTSTRAP_SERVERS",
@@ -74,8 +78,10 @@ def capture(evidence_readers, name: str, since: datetime):
 
 
 def started() -> datetime:
-    """A moment just before a trigger: the start of the window its evidence is read from."""
-    return datetime.now(UTC) - timedelta(seconds=5)
+    """The moment before a trigger: the start of the window its evidence is read from. One second of margin, no
+    more: the stack's clocks are this host's, and a wider window pulls in the scenario that ran just before (with
+    5 s, S13's snapshot held S11's dead letter; verification log M3 Phase 3 #4)."""
+    return datetime.now(UTC) - timedelta(seconds=1)
 
 
 def rows(effects, base: str, query: str, params: tuple = ()) -> list[tuple]:

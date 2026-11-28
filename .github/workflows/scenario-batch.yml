@@ -63,6 +63,7 @@ jobs:
           TEST_LEDGER_TOKEN: ${{ env.LEDGER_API_TOKEN }}
           TEST_POSTING_DB_PASSWORD: ${{ env.POSTING_DB_PASSWORD }}
           TEST_RELAY_METRICS_URL: http://127.0.0.1:9108/metrics
+          SCENARIO_DEV_RUNS: "1" # a new stack: each scenario's first trigger is its dev incident (run 0)
       - name: Stack logs (always, for the evidence)
         if: always()
         run: docker compose --profile core logs --tail 3000 > scenario-batch-stack-logs.txt 2>&1
