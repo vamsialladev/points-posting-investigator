@@ -43,7 +43,7 @@ from sqlalchemy import Engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.ops import logsink
-from app.pipeline import trace
+from app.pipeline import kafka_auth, trace
 from app.pipeline.events import CreditKind, InvalidEvent, ledger_key, plan_credit, validate
 from app.pipeline.ledger_client import LedgerPermanent, LedgerTransient, ledger_timeout
 from app.pipeline.posting import DatabaseFailure, DeadLetterFailure, IncomingMessage, LeaseLost
@@ -438,7 +438,9 @@ def main() -> int:
             timeout=ledger_timeout(env),
         ),
         deserialize,
-        DeadLetterPublisher(Producer({"bootstrap.servers": bootstrap, "acks": "all"}), topics.DLQ),
+        DeadLetterPublisher(
+            Producer({**kafka_auth.client_config(kafka_auth.POSTING, bootstrap), "acks": "all"}), topics.DLQ
+        ),
         RetryConfig(worker_id=env.get("RETRY_WORKER_ID", socket.gethostname())),
     )
     start_http_server(

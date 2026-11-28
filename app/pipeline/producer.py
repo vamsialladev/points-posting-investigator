@@ -35,7 +35,7 @@ from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroSerializer
 from confluent_kafka.serialization import MessageField, SerializationContext
 
-from app.pipeline import schemas, topics, trace
+from app.pipeline import kafka_auth, schemas, topics, trace
 from app.pipeline.events import PROPERTIES, TENANT
 
 SCHEMA_VERSION = "1"
@@ -89,7 +89,9 @@ DEFAULT_DELIVERY_TIMEOUT = 30.0
 _NO_REPORT = object()  # an event whose delivery report never arrived
 
 
-def checkout_producer_config(bootstrap: str, delivery_timeout: float = DEFAULT_DELIVERY_TIMEOUT) -> dict[str, Any]:
+def checkout_producer_config(
+    bootstrap: str, delivery_timeout: float = DEFAULT_DELIVERY_TIMEOUT, principal: str = kafka_auth.PRODUCER
+) -> dict[str, Any]:
     """Delivery-guarantee settings (ADR-0017):
     - idempotence and `acks=all`: the producer's own retries can't duplicate or reorder within a partition
     - **gapless**: a message lost in a way that could leave a gap fails the producer, so no later message of that
@@ -99,7 +101,7 @@ def checkout_producer_config(bootstrap: str, delivery_timeout: float = DEFAULT_D
     if delivery_timeout <= 0:
         raise ValueError("delivery_timeout must be positive")
     return {
-        "bootstrap.servers": bootstrap.replace("localhost", "127.0.0.1"),
+        **kafka_auth.client_config(principal, bootstrap),
         "enable.idempotence": True,
         "acks": "all",
         "enable.gapless.guarantee": True,
@@ -109,8 +111,10 @@ def checkout_producer_config(bootstrap: str, delivery_timeout: float = DEFAULT_D
     }
 
 
-def make_checkout_producer(bootstrap: str, delivery_timeout: float = DEFAULT_DELIVERY_TIMEOUT) -> Producer:
-    return Producer(checkout_producer_config(bootstrap, delivery_timeout))
+def make_checkout_producer(
+    bootstrap: str, delivery_timeout: float = DEFAULT_DELIVERY_TIMEOUT, principal: str = kafka_auth.PRODUCER
+) -> Producer:
+    return Producer(checkout_producer_config(bootstrap, delivery_timeout, principal))
 
 
 class DeliveryFailed(RuntimeError):

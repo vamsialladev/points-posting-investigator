@@ -22,7 +22,7 @@ from confluent_kafka.schema_registry.avro import AvroSerializer
 from confluent_kafka.serialization import MessageField, SerializationContext
 
 from app.ops import lag
-from app.pipeline import schemas, topics, trace
+from app.pipeline import kafka_auth, schemas, topics, trace
 from app.pipeline.producer import CheckoutProducer, make_checkout_producer
 from app.scenarios.stack import Kafka
 
@@ -32,10 +32,12 @@ SCAN_TIMEOUT_SECONDS = 30.0
 def build(bootstrap: str, registry_url: str, posting_group: str) -> Kafka:
     bootstrap = bootstrap.replace("localhost", "127.0.0.1")
     registry = SchemaRegistryClient({"url": registry_url.replace("://localhost", "://127.0.0.1"), "timeout": 10})
-    checkout = CheckoutProducer(make_checkout_producer(bootstrap), registry)
+    # The scenario tool breaks the local stack on purpose, so it acts as the broker's admin (ADR-0020).
+    base = kafka_auth.client_config(kafka_auth.ADMIN, bootstrap)
+    checkout = CheckoutProducer(make_checkout_producer(bootstrap, principal=kafka_auth.ADMIN), registry)
     serializer = AvroSerializer(registry, schemas.latest(topics.CHECKED_OUT))
-    raw = Producer({"bootstrap.servers": bootstrap, "acks": "all", "enable.idempotence": True})
-    lag_reader = Consumer({"bootstrap.servers": bootstrap, "group.id": posting_group, "enable.auto.commit": False})
+    raw = Producer({**base, "acks": "all", "enable.idempotence": True})
+    lag_reader = Consumer({**base, "group.id": posting_group, "enable.auto.commit": False})
 
     def serialize(record: dict[str, Any]) -> bytes:
         value = serializer(record, SerializationContext(topics.CHECKED_OUT, MessageField.VALUE))
@@ -59,12 +61,12 @@ def build(bootstrap: str, registry_url: str, posting_group: str) -> Kafka:
             raise RuntimeError(f"a raw event was not delivered: {errors[0].name() if errors else 'still queued'}")
 
     def dead_letter_event_ids() -> set[str]:
-        return scan_header(bootstrap, topics.DLQ, "event_id")
+        return scan_header(base, topics.DLQ, "event_id")
 
     def join_group(group: str) -> Callable[[], None]:
         consumer = Consumer(
             {
-                "bootstrap.servers": bootstrap,
+                **base,
                 "group.id": group,
                 "auto.offset.reset": "earliest",
                 "enable.auto.commit": False,
@@ -98,11 +100,12 @@ def build(bootstrap: str, registry_url: str, posting_group: str) -> Kafka:
     )
 
 
-def scan_header(bootstrap: str, topic: str, header: str, timeout: float = SCAN_TIMEOUT_SECONDS) -> set[str]:
-    """Every value of `header` on `topic`, from the first offset to the end offsets seen when the scan starts."""
+def scan_header(base: dict[str, Any], topic: str, header: str, timeout: float = SCAN_TIMEOUT_SECONDS) -> set[str]:
+    """Every value of `header` on `topic`, from the first offset to the end offsets seen when the scan starts.
+    `base` is the client's connection settings (`kafka_auth.client_config`)."""
     consumer = Consumer(
         {
-            "bootstrap.servers": bootstrap,
+            **base,
             "group.id": f"scenario-scan-{uuid.uuid4().hex[:10]}",  # assigned, never subscribed: no group is formed
             "enable.auto.commit": False,
             "enable.partition.eof": False,
