@@ -16,7 +16,7 @@ from datetime import date
 import pytest
 from confluent_kafka import Producer
 
-from app.pipeline import schemas, topics
+from app.pipeline import kafka_auth, schemas, topics
 from app.pipeline.producer import CheckoutProducer, DeliveryFailed, build_event, checkout_producer_config
 from tests.kafka_proxy import KafkaReplyCutter
 from tests.posting_helpers import read_raw
@@ -32,7 +32,10 @@ def event(member: str = "GR-00001", n: int = 1) -> dict:
 
 def test_a_send_to_a_topic_that_does_not_exist_fails_loudly(kafka, registry):
     missing = f"test.missing.{uuid.uuid4().hex[:10]}"  # auto-create is off: the broker refuses it
-    config = {**checkout_producer_config(kafka, delivery_timeout=5.0), "topic.metadata.propagation.max.ms": 1000}
+    config = {
+        **checkout_producer_config(kafka, delivery_timeout=5.0, principal=kafka_auth.ADMIN),
+        "topic.metadata.propagation.max.ms": 1000,
+    }
     producer = CheckoutProducer(
         Producer(config), registry, missing, schema=schemas.latest(topics.CHECKED_OUT), delivery_timeout=5.0
     )
@@ -71,7 +74,10 @@ def faulted_batch(registry, topic: str, *, idempotent: bool) -> tuple[int, list]
     Evidence of resends: a ProduceRequest reached the broker and its acknowledgement was cut, yet flush() saw every
     event delivered, so those batches were sent again. librdkafka's own counters (txretries, req_timeouts) stay at 0
     for a request lost to a disconnect, so they can't be the proof (verification log, M2 PR-B2b)."""
-    config = {**checkout_producer_config("127.0.0.1:19092", delivery_timeout=60.0), "request.timeout.ms": 1500}
+    config = {
+        **checkout_producer_config("127.0.0.1:19092", delivery_timeout=60.0, principal=kafka_auth.ADMIN),
+        "request.timeout.ms": 1500,
+    }
     if not idempotent:  # the control: the same settings an unsafe producer would have
         config.update({"enable.idempotence": False, "enable.gapless.guarantee": False})
     records = [event(m, i * 100 + n) for n in range(1, 21) for i, m in enumerate(MEMBERS, start=1)]

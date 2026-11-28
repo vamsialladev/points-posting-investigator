@@ -20,7 +20,7 @@ from sqlalchemy import Engine, text
 from app.ledger.api import create_app
 from app.ledger.core import LedgerSettings
 from app.ledger.store import PostgresCreditStore
-from app.pipeline import schemas, topics
+from app.pipeline import kafka_auth, schemas, topics
 from app.pipeline.ledger_client import LedgerClient, LedgerTransient
 from app.pipeline.posting import (
     DeadLetterPublisher,
@@ -33,6 +33,7 @@ from app.pipeline.posting import (
 )
 from app.pipeline.producer import CheckoutProducer, make_checkout_producer
 from app.pipeline.retry import ParkedStore, RetryConfig, RetryWorker
+from tests.infra import admin_kafka
 
 
 @contextmanager
@@ -59,11 +60,13 @@ def ledger_server(engine: Engine, token: str) -> Iterator[str]:
 
 def checkout_producer(kafka: str, registry: SchemaRegistryClient, topic: str) -> CheckoutProducer:
     # The real delivery settings (ADR-0017): a test whose events weren't all delivered fails at the send, loudly.
-    return CheckoutProducer(make_checkout_producer(kafka), registry, topic, schema=schemas.latest(topics.CHECKED_OUT))
+    # As the broker's admin: the producer's own identity may write the real checkout topic only (ADR-0020).
+    producer = make_checkout_producer(kafka, principal=kafka_auth.ADMIN)
+    return CheckoutProducer(producer, registry, topic, schema=schemas.latest(topics.CHECKED_OUT))
 
 
 def raw_producer(kafka: str) -> Producer:
-    return Producer({"bootstrap.servers": kafka})
+    return Producer(admin_kafka(kafka))
 
 
 def make_service(
@@ -82,7 +85,7 @@ def make_service(
         PostingStore(engine, output_topic),
         wrap(ledger) if wrap else ledger,
         avro_deserialize(registry),
-        DeadLetterPublisher(Producer({"bootstrap.servers": kafka, "acks": "all"}), dlq_topic),
+        DeadLetterPublisher(Producer({**admin_kafka(kafka), "acks": "all"}), dlq_topic),
         PostingConfig(output_topic=output_topic, dlq_topic=dlq_topic, park_base=0.02, park_cap=0.1),
         fault=fault,
     )
@@ -134,7 +137,7 @@ def make_worker(
         PostingStore(db["posting"], scratch["output"]),
         wrap(client) if wrap else client,
         avro_deserialize(registry),
-        DeadLetterPublisher(Producer({"bootstrap.servers": kafka, "acks": "all"}), scratch["dlq"]),
+        DeadLetterPublisher(Producer({**admin_kafka(kafka), "acks": "all"}), scratch["dlq"]),
         RetryConfig(worker_id=worker_id, **settings),
         fault=fault,
     )
@@ -182,7 +185,11 @@ def parked_rows(engine: Engine) -> list[dict[str, Any]]:
 
 
 def make_loop(service: PostingService, kafka: str, group: str, input_topic: str) -> PostingConsumer:
-    return PostingConsumer(service, make_consumer(kafka, group, [input_topic]), sleep=lambda s: time.sleep(min(s, 0.2)))
+    return PostingConsumer(
+        service,
+        make_consumer(kafka, group, [input_topic], principal=kafka_auth.ADMIN),
+        sleep=lambda s: time.sleep(min(s, 0.2)),
+    )
 
 
 def run_until(loop: PostingConsumer, wanted: int, timeout: float = 60.0) -> list[Outcome]:
@@ -210,7 +217,7 @@ def counts(engine: Engine, topic: str | None = None) -> tuple[int, int]:
 def read_raw(kafka: str, topic: str, at_least: int, timeout: float = 30.0) -> list[Any]:
     """Raw messages (no decoding) from a topic, reading 2 s past `at_least` so late duplicates are seen."""
     consumer = Consumer(
-        {"bootstrap.servers": kafka, "group.id": f"test-raw-{uuid.uuid4().hex[:8]}", "auto.offset.reset": "earliest"}
+        {**admin_kafka(kafka), "group.id": f"test-raw-{uuid.uuid4().hex[:8]}", "auto.offset.reset": "earliest"}
     )
     consumer.subscribe([topic])
     got, deadline, grace = [], time.monotonic() + timeout, None

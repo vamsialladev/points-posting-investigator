@@ -14,9 +14,10 @@ from confluent_kafka.schema_registry.avro import AvroDeserializer
 from confluent_kafka.serialization import MessageField, SerializationContext
 from sqlalchemy import Engine, insert, select, text
 
-from app.pipeline import schemas, topics, trace
+from app.pipeline import kafka_auth, schemas, topics, trace
 from app.pipeline.relay import AvroPayloadSerializer, OutboxStore, Relay, RelayConfig, RelayMetrics, make_producer
 from app.pipeline.tables import outbox
+from tests.infra import admin_kafka
 
 
 def payload(member: str, seq: int) -> dict[str, Any]:
@@ -86,7 +87,7 @@ def make_relay(
     serializer = AvroPayloadSerializer(registry, {topic: schemas.latest(topics.POINTS_POSTED)})
     return Relay(
         OutboxStore(engine),
-        make_producer(kafka, cfg.delivery_timeout),
+        make_producer(kafka, cfg.delivery_timeout, principal=kafka_auth.ADMIN),  # scratch topics (ADR-0020)
         serializer,
         cfg,
         metrics=RelayMetrics(),
@@ -133,7 +134,7 @@ def read_topic(
     so a duplicate published late is still counted."""
     consumer = Consumer(
         {
-            "bootstrap.servers": kafka,
+            **admin_kafka(kafka),
             "group.id": f"test-read-{uuid.uuid4().hex[:8]}",
             "auto.offset.reset": "earliest",
             "enable.auto.commit": False,

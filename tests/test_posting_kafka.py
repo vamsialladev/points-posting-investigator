@@ -12,7 +12,7 @@ import pytest
 from confluent_kafka import TopicPartition
 from sqlalchemy import select, text
 
-from app.pipeline import trace
+from app.pipeline import kafka_auth, trace
 from app.pipeline.posting import DatabaseFailure, IncomingMessage, Outcome, PostingCrash, make_consumer
 from app.pipeline.tables import outbox
 from tests.ledger_checks import credit_problems
@@ -167,7 +167,7 @@ def test_a_crash_after_the_db_commit_before_the_offset_commit_redelivers_and_sta
     with db["ledger"].connect() as conn:
         assert credit_problems(conn, expected_credits(rec)) == []
     second.consumer.close()
-    third = make_consumer(kafka, group, [scratch["input"]])
+    third = make_consumer(kafka, group, [scratch["input"]], principal=kafka_auth.ADMIN)
     committed = third.committed([TopicPartition(scratch["input"], p) for p in range(3)], timeout=10)
     third.close()
     assert sum(max(tp.offset, 0) for tp in committed) == 1  # exactly the one message is committed
@@ -366,7 +366,7 @@ def test_a_ledger_outage_parks_the_event_commits_the_offset_and_the_worker_posts
     assert run_until(loop, 1) == [Outcome.PARKED]
     assert counts(db["posting"]) == (0, 0)
     loop.consumer.close()
-    later = make_consumer(kafka, group, [scratch["input"]])
+    later = make_consumer(kafka, group, [scratch["input"]], principal=kafka_auth.ADMIN)
     committed = later.committed([TopicPartition(scratch["input"], p) for p in range(3)], timeout=10)
     later.close()
     assert sum(max(tp.offset, 0) for tp in committed) == 1  # the offset moved on: nothing blocks the partition
