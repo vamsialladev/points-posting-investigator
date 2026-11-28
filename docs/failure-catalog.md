@@ -65,7 +65,7 @@ set differs from the entry's.
 - **Rules enough:** yes
 
 ### S02: Duplicate event delivery
-- **Trigger:** `trigger S02`. Sends each event more than once (the load generator's `--duplicates`).
+- **Trigger:** `trigger S02`. Sends each event two or three times, with the same event ID.
 - **Expected behaviour:** one posting and one credit per stay revision; the extra deliveries are reported as
   duplicates.
 - **Root cause:** `duplicate_delivery`
@@ -172,8 +172,9 @@ set differs from the entry's.
 - **Expected behaviour:** postings and ledger credits are written; `points.posted` is not published until the
   relay starts again.
 - **Root cause:** `outbox_relay_stopped`
-- **Evidence:** outbox rows `pending` with rising age; `outbox_unpublished_rows` rising while the relay's metrics
-  stop answering; no new `points.posted` offsets; posting rows and credits present.
+- **Evidence:** outbox rows `pending` with rising age, in the outbox table; the relay's own metrics endpoint not
+  answering (so its `outbox_unpublished_rows` can't be read: the count comes from the table); no new
+  `points.posted` offsets; no relay lines in the stored logs after it stopped; posting rows and credits present.
 - **Recovery:** `none`. The rows are not dead. An operator starts the relay and it publishes them.
 - **Affected members:** none lost; their points are in the ledger, but downstream readers haven't been told.
 - **Reset:** `reset S10` (start the relay)
