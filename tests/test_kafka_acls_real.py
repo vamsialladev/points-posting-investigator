@@ -141,7 +141,8 @@ def test_the_access_list_on_the_broker_is_the_one_in_the_code(logins):
         kafka_admin.AclOperation.ANY,  # type: ignore[attr-defined]
         kafka_admin.AclPermissionType.ANY,  # type: ignore[attr-defined]
     )
-    found = AdminClient(config(auth.ADMIN, logins)).describe_acls(everything, request_timeout=20).result(timeout=20)
+    admin = AdminClient(config(auth.ADMIN, logins))  # kept in a name: the answer is lost if the client is collected
+    found = admin.describe_acls(everything, request_timeout=20).result(timeout=20)
     on_broker = {
         (b.principal, b.restype.name, b.name, b.resource_pattern_type.name, b.operation.name, b.permission_type.name)
         for b in found
