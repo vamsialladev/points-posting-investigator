@@ -12,6 +12,7 @@ written to `.scenario-runs/batch/`.
 
 from __future__ import annotations
 
+import subprocess
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -45,6 +46,29 @@ def triggered(effects, scenario: str, pair: str | None = None) -> Iterator[steps
         yield built
     finally:
         phase(effects, "reset", built)
+
+
+def thread_dump(service: str) -> str:
+    """Ask a stack service for every thread's stack (SIGUSR1, faulthandler) and return what it wrote. Diagnostic
+    only: it never fails a test, and says so when the dump can't be taken."""
+    compose = ["docker", "compose", "--profile", "core"]
+    try:
+        subprocess.run([*compose, "kill", "-s", "SIGUSR1", service], cwd=run.ROOT, capture_output=True, timeout=30)
+        time.sleep(1.0)
+        logs = subprocess.run(
+            [*compose, "logs", "--no-log-prefix", "--tail", "200", service],
+            cwd=run.ROOT,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return f"thread dump of {service}: not taken ({type(exc).__name__})"
+    lines = (logs.stdout + logs.stderr).splitlines()
+    starts = [n for n, line in enumerate(lines) if line.startswith(("Thread 0x", "Current thread 0x"))]
+    if not starts:
+        return f"thread dump of {service}: no stack found in its last 200 log lines"
+    return f"thread dump of {service}:\n" + "\n".join("  " + line[:170] for line in lines[starts[0] :][:90])
 
 
 def ids(events) -> list[str]:
@@ -141,6 +165,7 @@ def test_s07_a_posting_database_outage_makes_partitions_wait_and_nothing_is_lost
                 break
             time.sleep(1.0)
         print(f"S07: {len(stored)} stored posting lines in the last 90 s; {len(retries)} are DatabaseFailure retries")
+        print(thread_dump("posting"))  # where the service is right now, while its database is unreachable
         for at, level, message in stored[-40:]:
             print(f"  {at} {level} {message[:140]}")
         assert retries, "the outage left retry lines in the stored logs (waited up to 45 s)"

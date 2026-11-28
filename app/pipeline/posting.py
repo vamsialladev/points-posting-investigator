@@ -30,6 +30,7 @@ partition waits.
 
 from __future__ import annotations
 
+import faulthandler
 import logging
 import os
 import random
@@ -660,6 +661,12 @@ def main() -> int:
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stop.set())  # graceful: finish the message, commit, close (DEL-01)
     signal.signal(signal.SIGINT, lambda *_: stop.set())
+    # `docker compose kill -s SIGUSR1 posting` writes every thread's stack to stderr, even while the process is
+    # blocked inside a database or Kafka call. Added to find where S07 blocks (verification log, M3 Phase 2).
+    # Neither name exists on Windows; the service runs in a Linux container.
+    register, usr1 = getattr(faulthandler, "register", None), getattr(signal, "SIGUSR1", None)
+    if register is not None and usr1 is not None:
+        register(usr1, all_threads=True)
     log.info("posting service started")
     loop.run(stop)
     loop.consumer.close()
