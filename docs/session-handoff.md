@@ -68,8 +68,10 @@ rebuilds the image and `db-init` creates and migrates `ops`; no data is deleted.
 - **The adapter never writes a posting, outbox row, parked event or credit.** It writes only the scenario's own
   evidence rows in `ops`, and the reset deletes only the runbook line its trigger planted (by tag).
 - **Never edit a file through a shell heredoc here.** One turned a backslash into a line break inside
-  `docker-compose.yml` and only CI caught it (verification log M3 Phase 2 #9). Use the editor tools, or a script
-  file run with `uv run python`. `tests/test_compose_file.py` now parses the compose file offline.
+  `docker-compose.yml` and only CI caught it (verification log M3 Phase 2 #9). The owner's rule since then: file
+  tools only. `tests/test_compose_file.py` now parses the compose file offline.
+- **S13's evidence is on the topic only.** The posting row has no `occurred_at`, so the investigator's `get_events`
+  (Phase 4) must return an event's `occurred_at` next to the broker's timestamp. No test asserts that evidence yet.
 - **A CI-only timing race was found and fixed** (PR #12): tests that need the retry worker to reach a fault point
   must use `first_claim(worker)`, never a single `run_once()` straight after parking.
 - **Replay (Phase 5):** the posting service reports an already-parked event ID as a duplicate, so a dead parked
