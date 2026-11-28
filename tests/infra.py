@@ -19,6 +19,7 @@ from sqlalchemy.engine import URL, make_url
 
 from app.db.bootstrap import bootstrap, conninfo
 from app.db.roles import PASSWORD_VARIABLES, Database, runtime_url
+from app.pipeline import kafka_auth
 
 PREFIX = "test_"
 LEDGER = Database("ledger", PREFIX)
@@ -62,6 +63,12 @@ def registry() -> SchemaRegistryClient:
     # Bounded: the client has no timeout by default, and Karapace answers TimeoutError for a while after a Kafka
     # restart, so an unbounded cleanup call stretched one outage-test run far past its ~100 s (verification log).
     return SchemaRegistryClient({"url": url.replace("://localhost", "://127.0.0.1"), "timeout": 10, "max.retries": 2})
+
+
+def admin_kafka(bootstrap: str) -> dict[str, object]:
+    """Connection settings for a test's own Kafka client: the broker's admin, which may use any scratch topic and
+    group (ADR-0021). Plain settings when the stack has no SASL."""
+    return kafka_auth.client_config(kafka_auth.ADMIN, bootstrap)
 
 
 def role_url(database: Database, passwords: dict[str, str], host: dict[str, object], role: str = "app") -> URL:

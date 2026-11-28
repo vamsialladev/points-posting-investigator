@@ -59,8 +59,30 @@ services:
       KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://127.0.0.1:${KAFKA_HOST_PORT:-9092},FAULTS://127.0.0.1:19092
       # FAULTS (tests only): advertised as 127.0.0.1:19092, where tests/kafka_proxy.py listens and forwards to this
       # listener (host port 19093), dropping replies on demand to force producer retries (ADR-0017).
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,FAULTS:PLAINTEXT
+      # Every listener a client can reach asks for a login (SASL/PLAIN), and the broker refuses whatever the access
+      # list doesn't allow (ADR-0021; the list is app/pipeline/kafka_auth.py, applied by kafka-init). No TLS: the
+      # stack is local and binds loopback only. The controller listener stays plain, as in Apache Kafka's own
+      # single-node example; it isn't published to the host, and its ANONYMOUS principal is the broker itself.
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:SASL_PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:SASL_PLAINTEXT,FAULTS:SASL_PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
+      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: PLAIN
+      KAFKA_LISTENER_NAME_INTERNAL_PLAIN_SASL_JAAS_CONFIG: &kafka-users >-
+        org.apache.kafka.common.security.plain.PlainLoginModule required
+        username="admin"
+        password="${KAFKA_ADMIN_PASSWORD:?set KAFKA_ADMIN_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}"
+        user_admin="${KAFKA_ADMIN_PASSWORD}"
+        user_producer="${KAFKA_PRODUCER_PASSWORD:?set KAFKA_PRODUCER_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}"
+        user_posting="${KAFKA_POSTING_PASSWORD:?set KAFKA_POSTING_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}"
+        user_relay="${KAFKA_RELAY_PASSWORD:?set KAFKA_RELAY_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}"
+        user_registry="${KAFKA_REGISTRY_PASSWORD:?set KAFKA_REGISTRY_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}"
+        user_investigator="${KAFKA_INVESTIGATOR_PASSWORD:?set KAFKA_INVESTIGATOR_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}"
+        user_replayer="${KAFKA_REPLAYER_PASSWORD:?set KAFKA_REPLAYER_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}";
+      KAFKA_LISTENER_NAME_EXTERNAL_PLAIN_SASL_JAAS_CONFIG: *kafka-users
+      KAFKA_LISTENER_NAME_FAULTS_PLAIN_SASL_JAAS_CONFIG: *kafka-users
+      KAFKA_AUTHORIZER_CLASS_NAME: org.apache.kafka.metadata.authorizer.StandardAuthorizer
+      KAFKA_SUPER_USERS: User:admin;User:ANONYMOUS
+      BROKER_ADMIN_PASSWORD: ${KAFKA_ADMIN_PASSWORD}  # for the health check below; not a broker setting
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"  # topics come from app/pipeline/topics.py only
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
@@ -71,7 +93,12 @@ services:
       - "127.0.0.1:${KAFKA_HOST_PORT:-9092}:9092"
       - "127.0.0.1:19093:19093"  # the FAULTS listener, reached through the test proxy on 19092
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:29092 > /dev/null 2>&1"]
+      # Logs in as the admin, so "healthy" means the broker accepts a login, not only that a port is open.
+      test:
+        - CMD-SHELL
+        - >-
+          printf 'security.protocol=SASL_PLAINTEXT\nsasl.mechanism=PLAIN\nsasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="%s";\n' "$$BROKER_ADMIN_PASSWORD" > /tmp/health.properties
+          && /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:29092 --command-config /tmp/health.properties > /dev/null 2>&1
       timeout: 15s
       interval: 30s  # slow once healthy: each probe starts a process (Kafka: a JVM)
       start_interval: 2s  # fast while starting, so `up --wait` is still quick
@@ -86,6 +113,10 @@ services:
     environment:
       KARAPACE_KARAPACE_REGISTRY: "true"
       KARAPACE_BOOTSTRAP_URI: kafka:29092
+      KARAPACE_SECURITY_PROTOCOL: SASL_PLAINTEXT
+      KARAPACE_SASL_MECHANISM: PLAIN
+      KARAPACE_SASL_PLAIN_USERNAME: registry
+      KARAPACE_SASL_PLAIN_PASSWORD: ${KAFKA_REGISTRY_PASSWORD:?set KAFKA_REGISTRY_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
       KARAPACE_HOST: 0.0.0.0
       KARAPACE_PORT: 8081
       KARAPACE_ADVERTISED_HOSTNAME: schema-registry
@@ -126,9 +157,10 @@ services:
 
   kafka-init:
     <<: *app
-    command: [python, -m, app.pipeline.topics]
+    command: [python, -m, app.pipeline.topics]  # creates the topics, then applies the access list
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_ADMIN_PASSWORD: ${KAFKA_ADMIN_PASSWORD:?set KAFKA_ADMIN_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
     depends_on:
       kafka:
         condition: service_healthy
@@ -169,6 +201,7 @@ services:
       OPS_DB_PASSWORD: ${OPS_DB_PASSWORD:?set OPS_DB_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
       POSTGRES_HOST: db
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_POSTING_PASSWORD: ${KAFKA_POSTING_PASSWORD:?set KAFKA_POSTING_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
       SCHEMA_REGISTRY_URL: http://schema-registry:8081
       LEDGER_API_URL: http://ledger:8020
       LEDGER_TIMEOUT_SECONDS: ${LEDGER_TIMEOUT_SECONDS:-5.0}  # scenario S12 lowers it (RFC-0002)
@@ -204,6 +237,7 @@ services:
       OPS_DB_PASSWORD: ${OPS_DB_PASSWORD:?set OPS_DB_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
       POSTGRES_HOST: db
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_POSTING_PASSWORD: ${KAFKA_POSTING_PASSWORD:?set KAFKA_POSTING_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
       SCHEMA_REGISTRY_URL: http://schema-registry:8081
       LEDGER_API_URL: http://ledger:8020
       LEDGER_TIMEOUT_SECONDS: ${LEDGER_TIMEOUT_SECONDS:-5.0}  # scenario S12 lowers it (RFC-0002)
@@ -240,6 +274,7 @@ services:
       OPS_DB_PASSWORD: ${OPS_DB_PASSWORD:?set OPS_DB_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
       POSTGRES_HOST: db
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_RELAY_PASSWORD: ${KAFKA_RELAY_PASSWORD:?set KAFKA_RELAY_PASSWORD in .env (scripts\new_env.ps1 -AddMissing)}
       SCHEMA_REGISTRY_URL: http://schema-registry:8081
       RELAY_ID: relay-1
       RELAY_METRICS_HOST: 0.0.0.0

@@ -123,6 +123,14 @@ Kept current at every milestone. Each line says what is limited, why, and what w
 - **The 18 scenarios have run on GitHub's runners, not on the owner's machine.** Six run in the required CI job and
   twelve in the "Scenario batch" workflow. A slower or busier machine can behave differently (verification log M3
   #7 shows one such case), so a local run is still worth doing when the laptop is free.
+- **Kafka logins travel without TLS** (SASL/PLAIN on loopback and the compose network). Local stack only
+  (ADR-0021).
+- **The controller listener has no login,** and its anonymous principal is a super user. It isn't published to the
+  host; another container on the compose network could reach it.
+- **The access list is only ever added to.** An entry removed from the code stays on a running broker until the
+  Kafka container is recreated. A real-stack test compares the two lists.
+- **Tests run as the broker's admin on scratch topics,** so most real-stack tests don't exercise the service
+  identities' rights; `tests/test_kafka_acls_real.py` does.
 - **Two passing runs were not enough to trust a scenario check.** S07's first assertion depended on timing and
   failed on the third run (verification log M3 Phase 2 #14c). Other batch checks have run three or four times;
   that is evidence of stability on GitHub's runners, not proof.

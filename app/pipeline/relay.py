@@ -48,7 +48,7 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.types import BigInteger
 
 from app.ops import logsink
-from app.pipeline import trace
+from app.pipeline import kafka_auth, trace
 
 log = logging.getLogger("relay")
 
@@ -286,10 +286,10 @@ class OutboxStore:
 # ---------- Kafka side ----------
 
 
-def make_producer(bootstrap: str, delivery_timeout: float) -> Producer:
+def make_producer(bootstrap: str, delivery_timeout: float, principal: str = kafka_auth.RELAY) -> Producer:
     return Producer(
         {
-            "bootstrap.servers": bootstrap,
+            **kafka_auth.client_config(principal, bootstrap),
             "enable.idempotence": True,  # no duplicates from the producer's own retries within a session
             "acks": "all",
             "message.timeout.ms": int(delivery_timeout * 1000),  # a failed delivery is reported, not retried forever

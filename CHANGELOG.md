@@ -105,6 +105,9 @@ All notable changes to this project are documented here. The format follows
   - `python -m app.scenarios trigger|reset` and `scripts\scenario.ps1`, local stack only, with a manifest per run
     in `.scenario-runs/`
   - `LEDGER_TIMEOUT_SECONDS` on the posting service and the retry worker (5 s by default)
+- Kafka logins and a broker-enforced access list (ADR-0021): seven identities, each with its own
+  `KAFKA_<NAME>_PASSWORD`; the investigator's login can only describe and read (`app/pipeline/kafka_auth.py`,
+  `tests/test_kafka_acls_real.py`).
 - The "Scenario batch" workflow (GitHub Actions, not a required check): the 12 slow scenarios triggered, checked
   and reset on a real stack (`tests/test_scenarios_batch.py`, `scripts\test_integration.ps1 --batch`).
 

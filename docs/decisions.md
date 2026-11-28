@@ -627,3 +627,52 @@ this decision. Updates are added as dated bullets; nothing is rewritten.
 - **Result:** verification log, M3 Phase 2 (#13 onwards); `docs/evidence/m3-scenario-batch-ci-run-*.txt`.
 - **What would change this decision:** a slow scenario breaking unnoticed (then make the workflow required, or run
   it nightly), or the batch growing past the job's 45-minute limit (then split it).
+
+## ADR-0021: Kafka asks every client for a login, and the broker enforces a per-identity access list
+- **Context:** RFC-0002's first guarantee is that the investigator can never write, replay or post. Until now
+  every Kafka listener was plain: any process that reached the broker could produce to any topic, so the guarantee
+  rested on the investigator's own code. The owner approved turning on authentication and ACLs in the local stack
+  (2026-11-27).
+- **Options considered:**
+  - **Where the guarantee lives:**
+    1. In code only (the investigator has no produce call).
+    2. In the broker: a login per identity, and an access list the broker enforces.
+  - **Mechanism:**
+    1. SASL/PLAIN, with the users in the broker's own settings.
+    2. SASL/SCRAM, with credentials stored in the cluster's metadata.
+    3. mTLS.
+  - **The controller listener:**
+    1. Plain, not published to the host, as in Apache Kafka's own single-node SASL example.
+    2. SASL too.
+  - **Tests on scratch topics:**
+    1. Grant the service identities rights on a `test.` prefix.
+    2. Tests' own clients log in as the admin; separate tests log in as each identity against the real topics.
+- **Decision:** the second option for where the guarantee lives, and the first for the mechanism and the controller
+  listener; the second for tests.
+  - **Identities** (`app/pipeline/kafka_auth.py`): `admin` (the broker, topic and ACL creation, scenarios, tests),
+    `producer`, `posting` (the posting service and the retry worker), `relay`, `registry`, `investigator`,
+    `replayer`. Each has its own `KAFKA_<NAME>_PASSWORD`, and each container is given only its own.
+  - **The access list is data** (`kafka_auth.ACLS`), applied by `kafka-init` after it creates the topics. A
+    principal with no matching entry is refused: `allow.everyone.if.no.acl.found` stays off.
+  - **The investigator** may describe and read the three pipeline topics and describe the posting group. It has no
+    write, create, alter or delete entry, and can't commit an offset.
+  - **One function builds every client's settings** (`client_config(principal, bootstrap)`). Without that
+    principal's password in the environment the settings are plain, which is what unit tests use.
+  - **Super users:** `User:admin` and `User:ANONYMOUS`. Only the controller listener is plain, so only the broker
+    itself can be anonymous; every listener a client can reach requires a login.
+- **Tradeoff:**
+  - **No TLS:** passwords cross the loopback interface and the compose network in clear text. Local stack only; a
+    hosted stack needs SASL over TLS (or SCRAM or mTLS) and is v2.
+  - **The controller listener is plain and its principal is a super user.** It isn't published to the host, but
+    another container on the compose network could reach it. Accepted for a local stack; named in the threat model
+    when that is written (SEC-08).
+  - **PLAIN keeps the passwords in the broker's settings.** Rotating one means restarting the broker.
+  - **Seven more local values in `.env`**, and the broker's start now depends on all of them.
+  - **Tests run as the admin on scratch topics,** so they don't exercise the service identities' rights. The
+    access-list tests do that, against the real topics, with writes the broker must refuse.
+  - **`ensure_acls` only adds.** An entry removed from the list stays on a running broker until it is deleted by
+    hand or the Kafka container is recreated (it has no volume). A test compares the broker's list with the code's.
+- **Result:** `tests/test_kafka_auth.py` (offline), `tests/test_kafka_acls_real.py` (real stack); verification
+  log, M3 Phase 2.
+- **What would change this decision:** a hosted deployment (then TLS and per-broker credentials), or needing to
+  rotate a login without a broker restart (then SCRAM).

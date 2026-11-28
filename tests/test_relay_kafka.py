@@ -22,7 +22,7 @@ from sqlalchemy import Engine, create_engine, text
 
 from app.pipeline import topics, trace
 from app.pipeline.relay import OutboxStore, RelayCrash
-from tests.infra import POSTING, admin_connect, role_url
+from tests.infra import POSTING, admin_connect, admin_kafka, role_url
 from tests.relay_helpers import (
     drain,
     make_relay,
@@ -59,7 +59,7 @@ def topic(kafka, registry) -> Iterator[str]:
     name = f"test.relay.{uuid.uuid4().hex[:10]}"
     topics.ensure_topics(kafka, (topics.TopicSpec(name),))
     yield name
-    AdminClient({"bootstrap.servers": kafka}).delete_topics([name], operation_timeout=30)
+    AdminClient(admin_kafka(kafka)).delete_topics([name], operation_timeout=30)
     drop_subject(registry, f"{name}-value")
 
 
@@ -228,7 +228,7 @@ def wait_for_kafka(kafka: str, timeout: float = 180.0) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
-            AdminClient({"bootstrap.servers": kafka}).list_topics(timeout=3)
+            AdminClient(admin_kafka(kafka)).list_topics(timeout=3)
             return
         except Exception:  # still starting
             time.sleep(2)

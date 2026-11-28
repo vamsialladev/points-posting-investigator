@@ -19,7 +19,7 @@ from sqlalchemy import Engine, create_engine
 from app.pipeline import topics
 from app.pipeline.events import ledger_key, points_for, validate
 from app.pipeline.producer import build_event
-from tests.infra import LEDGER, POSTING, admin_connect, role_url
+from tests.infra import LEDGER, POSTING, admin_connect, admin_kafka, role_url
 from tests.posting_helpers import ledger_server
 from tests.test_kafka_stack import drop_subject
 
@@ -53,7 +53,7 @@ def scratch(kafka, registry) -> Iterator[dict[str, str]]:
     names = {"input": f"test.in.{tag}", "output": f"test.out.{tag}", "dlq": f"test.dlq.{tag}"}
     topics.ensure_topics(kafka, tuple(topics.TopicSpec(name) for name in names.values()))
     yield names
-    AdminClient({"bootstrap.servers": kafka}).delete_topics(list(names.values()), operation_timeout=30)
+    AdminClient(admin_kafka(kafka)).delete_topics(list(names.values()), operation_timeout=30)
     for name in names.values():
         drop_subject(registry, f"{name}-value")
 

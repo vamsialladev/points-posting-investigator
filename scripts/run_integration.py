@@ -24,6 +24,15 @@ MAPPING = {
     "TEST_POSTING_DB_PASSWORD": "POSTING_DB_PASSWORD",
 }
 FIXED = {"TEST_RELAY_METRICS_URL": "http://127.0.0.1:9108/metrics"}  # the compose relay's port, not a secret
+KAFKA_LOGINS = (
+    "KAFKA_ADMIN_PASSWORD",
+    "KAFKA_PRODUCER_PASSWORD",
+    "KAFKA_POSTING_PASSWORD",
+    "KAFKA_RELAY_PASSWORD",
+    "KAFKA_REGISTRY_PASSWORD",
+    "KAFKA_INVESTIGATOR_PASSWORD",
+    "KAFKA_REPLAYER_PASSWORD",
+)  # app.pipeline.kafka_auth.PASSWORD_VARIABLES; tests/test_kafka_auth.py keeps the two equal
 
 
 def main(argv: list[str]) -> int:
@@ -40,6 +49,15 @@ def main(argv: list[str]) -> int:
     print(f"stack settings: {found}/{len(MAPPING)} set" + (f"; missing {missing}" if missing else ""))
     for name, value in FIXED.items():
         env.setdefault(name, value)
+    # The stack's Kafka logins, under their own names: the tests' clients log in as the broker's admin, and the
+    # access-list tests log in as each identity (ADR-0021). Counted, never printed.
+    logins = 0
+    for name in KAFKA_LOGINS:
+        value = env.get(name) or values.get(name)
+        if value:
+            env[name] = value
+            logins += 1
+    print(f"kafka logins: {logins}/{len(KAFKA_LOGINS)} set")
     env["REQUIRE_MARKERS"] = "postgres,kafka"
     # `--batch` runs only the slow scenario batch (tests/test_scenarios_batch.py); without it the batch is left out,
     # so the required CI job stays fast. Either way a skipped or missing postgres/kafka test is a failure.

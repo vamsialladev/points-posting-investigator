@@ -51,7 +51,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.ops import logsink
-from app.pipeline import topics, trace
+from app.pipeline import kafka_auth, topics, trace
 from app.pipeline.events import (
     CreditKind,
     CreditPlan,
@@ -493,10 +493,10 @@ class PostingService:
 # ---------- the consumer loop ----------
 
 
-def make_consumer(bootstrap: str, group_id: str, subscribe: list[str]) -> Consumer:
+def make_consumer(bootstrap: str, group_id: str, subscribe: list[str], principal: str = kafka_auth.POSTING) -> Consumer:
     consumer = Consumer(
         {
-            "bootstrap.servers": bootstrap.replace("localhost", "127.0.0.1"),
+            **kafka_auth.client_config(principal, bootstrap),
             "group.id": group_id,
             "auto.offset.reset": "earliest",
             "enable.auto.commit": False,  # offsets are committed by hand, after the database transaction
@@ -632,7 +632,9 @@ def main() -> int:
             timeout=ledger_timeout(env),
         ),
         deserialize,
-        DeadLetterPublisher(Producer({"bootstrap.servers": bootstrap, "acks": "all"}), topics.DLQ),
+        DeadLetterPublisher(
+            Producer({**kafka_auth.client_config(kafka_auth.POSTING, bootstrap), "acks": "all"}), topics.DLQ
+        ),
     )
     loop = PostingConsumer(
         service, make_consumer(bootstrap, env.get("POSTING_GROUP_ID", "posting-service"), [topics.CHECKED_OUT])

@@ -90,6 +90,19 @@ def _bootstrap_servers(value: str) -> bool:
     return re.fullmatch(r"[A-Za-z0-9.\-]+:\d{2,5}(,[A-Za-z0-9.\-]+:\d{2,5})*", value.strip()) is not None
 
 
+_KAFKA_PASSWORDS = (
+    "KAFKA_ADMIN_PASSWORD",
+    "KAFKA_PRODUCER_PASSWORD",
+    "KAFKA_POSTING_PASSWORD",
+    "KAFKA_RELAY_PASSWORD",
+    "KAFKA_REGISTRY_PASSWORD",
+    "KAFKA_INVESTIGATOR_PASSWORD",
+    "KAFKA_REPLAYER_PASSWORD",
+)  # tests/test_kafka_auth.py keeps this equal to app.pipeline.kafka_auth.PASSWORD_VARIABLES
+_KAFKA_LOGIN_SHAPE = r"[A-Za-z0-9_-]{12,}"  # the shape a value must have, not a value
+_KAFKA_LOGIN_EXPECTED = "at least 12 letters, digits, - or _"
+
+
 @dataclass(frozen=True)
 class Var:
     name: str
@@ -118,6 +131,9 @@ VARS: dict[str, Var] = {
         # Kafka
         Var("KAFKA_BOOTSTRAP_SERVERS", _bootstrap_servers, "host:port[,host:port]"),
         Var("SCHEMA_REGISTRY_URL", _url("http", "https"), "an http(s) URL"),
+        # One Kafka login per identity (ADR-0021). The value sits inside the broker's quoted login list, so a quote,
+        # a backslash or a space in it would break the broker's start.
+        *[Var(name, _regex(_KAFKA_LOGIN_SHAPE), _KAFKA_LOGIN_EXPECTED, secret=True) for name in _KAFKA_PASSWORDS],
         # Ledger mock
         Var("LEDGER_API_URL", _url("http", "https"), "an http(s) URL"),
         Var("LEDGER_API_TOKEN", _min_len(12), "at least 12 characters", secret=True),
@@ -172,6 +188,7 @@ _CORE = (
     "RELAY_DB_PASSWORD",
     "OPS_DB_PASSWORD",
     "KAFKA_BOOTSTRAP_SERVERS",
+    *_KAFKA_PASSWORDS,
     "SCHEMA_REGISTRY_URL",
     "LEDGER_API_URL",
     "LEDGER_API_TOKEN",
@@ -422,6 +439,7 @@ FEATURES: dict[str, tuple[str, ...]] = {
         "RELAY_DB_PASSWORD",
         "OPS_DB_PASSWORD",
         "KAFKA_BOOTSTRAP_SERVERS",
+        *_KAFKA_PASSWORDS,
         "LEDGER_API_TOKEN",
     ),
     "Live Claude runs (arm C live; needs the owner's OK and a cap)": ("ANTHROPIC_API_KEY", "ANTHROPIC_MODEL"),

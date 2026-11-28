@@ -21,6 +21,7 @@ from confluent_kafka.schema_registry.avro import AvroDeserializer, AvroSerialize
 from confluent_kafka.serialization import MessageField, SerializationContext
 
 from app.pipeline import schemas, topics
+from tests.infra import admin_kafka
 
 pytestmark = pytest.mark.kafka
 
@@ -29,7 +30,7 @@ pytestmark = pytest.mark.kafka
 def scratch_topic(kafka: str) -> Iterator[str]:
     name = f"test.{uuid.uuid4().hex[:12]}"
     yield name
-    AdminClient({"bootstrap.servers": kafka}).delete_topics([name], operation_timeout=30)
+    AdminClient(admin_kafka(kafka)).delete_topics([name], operation_timeout=30)
 
 
 def stay_record() -> dict[str, object]:
@@ -54,7 +55,7 @@ def stay_record() -> dict[str, object]:
 
 
 def test_the_stack_has_every_pipeline_topic_with_three_partitions(kafka):
-    metadata = AdminClient({"bootstrap.servers": kafka}).list_topics(timeout=30)
+    metadata = AdminClient(admin_kafka(kafka)).list_topics(timeout=30)
     for spec in topics.TOPICS:
         assert spec.name in metadata.topics, f"{spec.name} missing: did kafka-init run?"
         assert len(metadata.topics[spec.name].partitions) == spec.partitions
@@ -71,7 +72,7 @@ def test_an_avro_event_round_trips_through_kafka_and_karapace(kafka, registry, s
     schema = schemas.latest(topics.CHECKED_OUT)
     serialize = AvroSerializer(registry, schema)
     record = stay_record()
-    producer = Producer({"bootstrap.servers": kafka, "enable.idempotence": True, "acks": "all"})
+    producer = Producer({**admin_kafka(kafka), "enable.idempotence": True, "acks": "all"})
     delivered: list[object] = []
     producer.produce(
         scratch_topic,
@@ -85,7 +86,7 @@ def test_an_avro_event_round_trips_through_kafka_and_karapace(kafka, registry, s
 
     consumer = Consumer(
         {
-            "bootstrap.servers": kafka,
+            **admin_kafka(kafka),
             "group.id": f"test-{uuid.uuid4().hex[:8]}",
             "auto.offset.reset": "earliest",
             "enable.auto.commit": False,  # D-semantics: commit after processing, never before
