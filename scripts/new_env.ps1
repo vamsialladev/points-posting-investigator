@@ -24,6 +24,7 @@ $generated = [ordered]@{
     "POSTING_DB_PASSWORD"       = 24
     "RELAY_DB_PASSWORD"         = 24
     "OPS_DB_PASSWORD"           = 24
+    "INVESTIGATOR_DB_PASSWORD"  = 24
     "KAFKA_ADMIN_PASSWORD"        = 24
     "KAFKA_PRODUCER_PASSWORD"     = 24
     "KAFKA_POSTING_PASSWORD"      = 24

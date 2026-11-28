@@ -1,10 +1,17 @@
 # Session handoff
 
-**Updated:** 2026-11-28 (UTC). **RFC-0002 Phase 1 is done and Phase 2 is done except Kafka SASL and ACLs.** All 18
-scenarios trigger and reset on a real stack in GitHub Actions (6 in the required CI job, 12 in the "Scenario batch"
-workflow), and Kafka asks every client for a login with a broker-enforced access list. Merged: PRs #11 to #17.
-Open: #18 (rebalance log lines, catalog corrections, and the S07 diagnosis below). Milestone 2
-is complete. The owner's "Milestone 3" (a read-only AI investigator plus human-approved replay) runs as the phases of
+**Updated:** 2026-11-28 (UTC). **RFC-0002 Phases 1 and 2 are done; Phase 3 is in progress.** All 18 scenarios
+trigger and reset on a real stack in GitHub Actions (6 in the required CI job, 12 in the "Scenario batch"
+workflow), and Kafka asks every client for a login with a broker-enforced access list. Merged: PRs #11 to #18.
+Milestone 2 is complete.
+
+**Owner's decision, 2026-11-28: no local scenario batch. GitHub Actions is the source of truth for scenario
+runs.** Don't start the local stack for scenarios; the laptop stays free for other stages.
+
+**Autopilot for Phase 3 (owner, 2026-11-28):** up to $3 of live API spend is pre-approved for this phase; merges
+on green. **Hard stops only:** exceeding the cap, anything newly public, deleting real data, changing real
+secrets, weakening a gate, or a result after the freeze that contradicts the plan. Collect decisions into one
+message at the end, each with a recommended answer; report in 5 lines. The owner's "Milestone 3" (a read-only AI investigator plus human-approved replay) runs as the phases of
 `docs/rfcs/RFC-0002-investigator-and-approved-replay.md` across spec M3, M6 and M7 (ADR-0019).
 
 ## Start of the next session

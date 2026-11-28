@@ -77,7 +77,17 @@ def test_the_posting_service_never_changes_an_outbox_row_and_the_relay_never_wri
 
 
 def test_every_runtime_role_has_its_own_password_variable():
-    assert PASSWORD_VARIABLES == ("LEDGER_DB_PASSWORD", "POSTING_DB_PASSWORD", "RELAY_DB_PASSWORD", "OPS_DB_PASSWORD")
+    # The service roles each have their own; the three read-only investigator roles share one (the same process
+    # uses all three, and none of them can write).
+    assert PASSWORD_VARIABLES == (
+        "LEDGER_DB_PASSWORD",
+        "INVESTIGATOR_DB_PASSWORD",
+        "POSTING_DB_PASSWORD",
+        "RELAY_DB_PASSWORD",
+        "OPS_DB_PASSWORD",
+    )
+    service_roles = [r for roles in RUNTIME_ROLES.values() for r in roles if r.suffix != "investigator"]
+    assert len({r.password_variable for r in service_roles}) == len(service_roles)
     assert Database("posting", "test_").role_name("relay") == "test_posting_relay"
     with pytest.raises(ValueError):
         Database("ledger").role_name("relay")
@@ -89,8 +99,27 @@ def test_grants_are_revoke_then_grant_for_each_object_and_role():
     assert len(rendered) == 2 * sum(len(role.grants) for role in RUNTIME_ROLES["posting"])
     assert rendered[0] == 'REVOKE ALL ON TABLE "posting" FROM "test_posting_app"'
     assert rendered[1] == 'GRANT SELECT, INSERT ON TABLE "posting" TO "test_posting_app"'
-    assert rendered[-2] == 'REVOKE ALL ON TABLE "outbox" FROM "test_posting_relay"'
+    assert 'REVOKE ALL ON TABLE "outbox" FROM "test_posting_relay"' in rendered
+    assert rendered[-2] == 'REVOKE ALL ON TABLE "skipped_event" FROM "test_posting_investigator"'
+    assert rendered[-1] == 'GRANT SELECT ON TABLE "skipped_event" TO "test_posting_investigator"'
     assert all(isinstance(s, sql.Composed) for s in statements)
+
+
+def test_every_investigator_role_can_only_select_and_never_the_raw_bytes_of_a_parked_event():
+    """The read-only guarantee, as data: no investigator grant names anything but SELECT."""
+    for base, roles in RUNTIME_ROLES.items():
+        (reader,) = [role for role in roles if role.suffix == "investigator"]
+        assert reader.read_only and reader.password_variable == "INVESTIGATOR_DB_PASSWORD", base
+        for target, privileges in reader.grants.items():
+            assert target.startswith("TABLE "), f"{base}: no sequence, so no nextval: {target}"
+            assert privileges.split(" (")[0] == "SELECT", f"{base}.{target}: {privileges}"
+        assert all(not role.read_only for role in roles if role.suffix != "investigator")
+    parked = next(r for r in RUNTIME_ROLES["posting"] if r.suffix == "investigator").grants["TABLE parked_event"]
+    assert "raw_value" not in parked and "raw_key" not in parked and "raw_headers" in parked
+    assert set(RUNTIME_ROLES["ops"][-1].grants) == {
+        f"TABLE {name}"
+        for name in ("log_event", "change_event", "member_question", "alert_evaluation", "runbook_section")
+    }
 
 
 def test_each_database_has_a_migration_tree_matching_its_tables():

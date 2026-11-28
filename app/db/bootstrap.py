@@ -78,6 +78,11 @@ def bootstrap(admin_url: URL, passwords: Mapping[str, str], prefix: str = "", re
                         sql.Identifier(name), sql.Literal(passwords[runtime.password_variable])
                     )
                 )
+                if runtime.read_only:
+                    # Applies to the role's next sessions: a second guard, behind the SELECT-only grants.
+                    conn.execute(
+                        sql.SQL("ALTER ROLE {} SET default_transaction_read_only = on").format(sql.Identifier(name))
+                    )
             if reset:
                 conn.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(database.name)))
             if not _database_exists(conn, database.name):
