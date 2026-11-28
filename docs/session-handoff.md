@@ -10,24 +10,36 @@ complete. The owner's "Milestone 3" (a read-only AI investigator plus human-appr
 3. Continue with the first phase below that isn't done. The plan is approved: no new approval is needed for a
    phase, only for what "Standing orders" lists.
 
-## Standing orders from the owner (2026-11-27, for the RFC-0002 program)
-- Decide routine engineering choices and record them in an ADR. Batch questions: at most 3, each with a
-  recommended answer, only when blocked.
-- Small PRs, CI first, auto-merge on green. Wait for the owner only if a check fails or the change touches money,
-  secrets, hosting or public content.
-- **Always ask before:** paid model spend, publishing, deleting data, weakening a test or gate.
-- **Machine sharing:** other sessions use this laptop (Stage 9's M13 paid Phase 3, then Stage 11's benchmark chain).
-  Before every real-stack batch in Phases 2, 4 and 5: `scripts\quiet_check.ps1 -Minutes 5`, then **ask the owner**.
-  **The quiet check alone is never enough:** start a batch only after the owner says "machine is free".
-- **The Phase 2 batch is approved, waiting for "machine is free"** (owner, 2026-11-27): then run the 12 remaining
-  scenarios one at a time, bring the stack down with data kept, and give a 5-line report.
-- **Edits: file tools only, never a shell heredoc** (`CLAUDE.md`, Windows notes).
-- Work straight through; don't wait between steps unless a rule here requires it.
-  Use scratch topics for probes. Bring the stack down afterwards and keep the data. Offline and unit work can go on
-  at any time. Work only in this repo's folder.
-- **The live run (Phase 7)** is pre-approved with a hard cap of **$3**. Before it: re-check Haiku 5.5's price on
-  Anthropic's official pricing page, redo the estimate, and show it to the owner.
-- Report each phase end in at most 5 lines: done, pass counts, cost, next, what the owner must do.
+## Standing orders from the owner (2026-11-27, latest version; they replace the earlier ones)
+Speed:
+1. Work straight through. Don't wait between steps unless a rule below requires it.
+2. Decide routine choices yourself and record them in an ADR. Batch any questions into one message, each with a
+   recommended answer, and keep working on everything else while waiting.
+3. Within an already approved cap: re-run flagged or killed runs, and fix your own script or test bugs, without
+   asking. Log each one in the verification log.
+4. **Run real-stack and Docker work in GitHub Actions instead of on the laptop wherever possible,** so it can run in
+   parallel. The "Scenario batch" workflow does this for the slow scenarios.
+5. **The laptop is shared** (Stage 9's M13, Stage 11's benchmarks). Before any local benchmark or Docker stack, the
+   owner must have said "machine is free" for this session. `scripts\quiet_check.ps1` alone is never enough.
+   Benchmarks go one at a time. Afterwards bring the stack down and keep the data. Work only in this repo's folder.
+6. Merge on green with auto-merge. Fix failing CI yourself and push again.
+7. Keep this file current after every milestone step.
+
+Quality (never skip):
+
+8. **Ask before:** new paid spend or raising a cap, deploys, publishing or making anything public, deleting data,
+   changing secrets or Cloud Run/Neon, or weakening any test, gate or branch protection.
+9. Never invent results, numbers or passes. Never print or commit secrets.
+10. Run the relevant guard tests locally before pushing (the compose and workflow parse tests, the pre-registration
+    tests, and so on).
+11. **Never use shell heredocs; edit files with the file tools only** (`CLAUDE.md`, Windows notes).
+12. Report in 5 lines: done, numbers, spend against the cap, what's next, and what is needed from the owner (or
+    "nothing").
+
+Already approved:
+- **The live run (Phase 7):** a hard cap of **$3**. Before it: re-check Haiku 5.5's price on Anthropic's official
+  pricing page, redo the estimate, and show it to the owner.
+- **New local passwords in `.env`** through `scripts\new_env.ps1 -AddMissing` (database roles and Kafka identities).
 
 ## RFC-0002 phases
 | Phase | Content | State |
@@ -51,8 +63,8 @@ complete. The owner's "Milestone 3" (a read-only AI investigator plus human-appr
 | Lag calculation and a read-only reader (`app/ops/lag.py`); alert rules (`ops/alert-rules.yaml`) and evaluator (`app/ops/alerts.py`) | done, merged (PR #13) |
 | The `ops` database (`app/ops/tables.py`, `migrations/ops/`): `log_event`, `change_event`, `member_question`, `alert_evaluation`, `runbook_section`; the insert-only role `ops_app`; the log handler `app/ops/logsink.py`, installed by the four services | done, merged (PR #14); the role's rights verified on real Postgres in CI. `OPS_DB_PASSWORD` is in the owner's `.env` (added 2026-11-27 with `new_env.ps1 -AddMissing`; preflight `core` READY) |
 | The executor (`executor.py`), the local-stack adapter (`stack.py`, `kafka_io.py`), `trigger` and `reset` with a manifest in `.scenario-runs/` (`run.py`), `scripts\scenario.ps1`, `LEDGER_TIMEOUT_SECONDS` | done, merged (PR #14). S01, S02, S05, S11, S13 and S16 triggered and reset on CI's stack (`tests/test_scenarios_real.py`; 91 real-stack tests passed, run 46058085179) |
-| The other 12 scenarios on a real stack (S03, S04, S06 to S10, S12, S14, S15, S17, S18) | **not run yet**. This is the batch on the owner's machine, approved and waiting for "machine is free". Command per scenario: `scripts\scenario.ps1 trigger S03`, then `scripts\scenario.ps1 reset S03` (S15: `-Pair A`, then `-Pair B -Run 1`). Expect fixes: compose restarts, the role switch, the group flap and the alert step have never met a real stack |
-| Kafka SASL and ACLs, in its own PR | **not started**. Adds Kafka passwords to `.env` (already approved); the real-stack tests must pass before merge |
+| The other 12 scenarios on a real stack (S03, S04, S06 to S10, S12, S14, S15, S17, S18) | **done in GitHub Actions** (owner's order 4): `tests/test_scenarios_batch.py`, the "Scenario batch" workflow (`.github/workflows/scenario-batch.yml`, not a required check), PR #16. Results: verification log M3 Phase 2 and `docs/evidence/m3-scenario-batch-ci-run-*.txt`. Locally it is `scripts\test_integration.ps1 --batch` with the stack up, and only after the owner says "machine is free"; a local run is optional now |
+| Kafka SASL and ACLs, in its own PR | **in progress on branch `m3/kafka-sasl`** (pushed work in progress, no PR yet). Done there: `app/pipeline/kafka_auth.py` (one settings function per identity; the access list as data, the investigator describe and read only), every app and test client wired to it, `topics.ensure_acls`. Not done: the broker's SASL listeners and authorizer in `docker-compose.yml`, Karapace's login, the seven `KAFKA_*_PASSWORD` names (`new_env.ps1`, `.env.example`, preflight, both workflows), real-stack tests that the broker refuses an investigator's produce, ADR-0020. Verify in GitHub Actions, not locally |
 
 **The stack on this machine was created before the `ops` database existed.** The next `scripts\stack.ps1 up`
 rebuilds the image and `db-init` creates and migrates `ops`; no data is deleted.
