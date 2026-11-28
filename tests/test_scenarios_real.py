@@ -138,7 +138,10 @@ def test_s13_the_skew_shows_on_the_topic_and_only_there(effects, tmp_path):
     snapshot = SNAPSHOTS["S13"]
     posted = [i for i in snapshot.of("posting") if i.id.removeprefix("posting:") in skewed_ids]
     assert len(posted) >= 8 and all("occurred_at" not in i.data for i in posted)
-    assert snapshot.of("parked") == [] and snapshot.of("dead_letter") == []
+    # None of S13's events was parked or dead-lettered. The window starts just before the trigger on a shared stack,
+    # so it can hold the scenario before it (S11's dead letter lands seconds earlier): judge S13's own events only.
+    aside = [i for i in (*snapshot.of("parked"), *snapshot.of("dead_letter")) if i.data.get("event_id") in skewed_ids]
+    assert aside == []
 
 
 def test_s16_leaves_a_question_and_nothing_else(effects, tmp_path):
