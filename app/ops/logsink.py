@@ -4,7 +4,9 @@
 
 Rules, each tested:
 - **Logging never hurts the service.** `emit` only puts a small record on a bounded queue. A background thread writes
-  batches. A full queue or a database failure drops lines and counts them; nothing is raised into the service.
+  batches. Nothing is raised into the service. A full queue drops lines and counts them. A failed write keeps its
+  batch and tries again on the next cycles, and says so on stderr (the error's type and SQL state, never the text
+  of a log line); after 20 tries the batch is dropped and counted.
 - **Bounded:** the message is cut at 500 characters, and only INFO and above is stored by default.
 - **Insert-only:** the handler connects as `ops_app`, which can't read, change or delete a log line.
 - **IDs when the line has them:** `correlation_id`, `trace_id` and `event_id` from the record's `extra`.
@@ -16,10 +18,13 @@ offsets and error classes, never event bodies.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import queue
+import sys
 import threading
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -36,6 +41,10 @@ class SinkStats:
     stored: int = 0
     dropped_full: int = 0  # the queue was full
     dropped_failed: int = 0  # the database refused or was down
+
+
+def _stderr(text: str) -> None:
+    print(text, file=sys.stderr, flush=True)  # not through logging: this reports the log handler's own trouble
 
 
 def row_of(service: str, record: logging.LogRecord) -> dict[str, Any]:
@@ -59,15 +68,29 @@ def row_of(service: str, record: logging.LogRecord) -> dict[str, Any]:
 
 
 class OpsLogHandler(logging.Handler):
-    def __init__(self, service: str, writer: Writer, *, capacity: int = 1000, batch: int = 50) -> None:
+    def __init__(
+        self,
+        service: str,
+        writer: Writer,
+        *,
+        capacity: int = 1000,
+        batch: int = 50,
+        max_tries: int = 20,
+        report: Callable[[str], None] | None = None,
+    ) -> None:
         super().__init__()
-        if capacity < 1 or batch < 1:
-            raise ValueError("capacity and batch must be at least 1")
+        if capacity < 1 or batch < 1 or max_tries < 1:
+            raise ValueError("capacity, batch and max_tries must be at least 1")
         self.service, self.writer, self.batch = service, writer, batch
         self.stats = SinkStats()
         self._queue: queue.Queue[dict[str, Any]] = queue.Queue(maxsize=capacity)
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self._held: list[dict[str, Any]] = []  # a batch whose write failed, kept for the next cycles
+        self._held_tries = 0
+        self._last_report = 0.0
+        self.max_tries = max_tries
+        self.report = report
 
     def emit(self, record: logging.LogRecord) -> None:
         if record.name.startswith(("sqlalchemy", "psycopg")):
@@ -80,23 +103,56 @@ class OpsLogHandler(logging.Handler):
             self.stats.dropped_failed += 1
 
     def drain(self) -> int:
-        """Write what is queued, in batches. Returns how many rows were taken off the queue."""
+        """Write what is queued, in batches. Returns how many rows were taken off the queue.
+
+        A batch whose write fails is **kept and tried again** on the next cycles (up to `max_tries`), and the failure
+        is reported on stderr with its type and SQL state, never the log text. The first version dropped such a batch
+        at once and only counted it in memory: during scenario S07 that lost four of six retry lines with no trace
+        of why (verification log, M3 Phase 2). While a batch is held, nothing newer is written, so order is kept;
+        the queue is bounded, so a long outage still costs lines rather than memory."""
         taken = 0
         while True:
-            rows: list[dict[str, Any]] = []
-            while len(rows) < self.batch:
-                try:
-                    rows.append(self._queue.get_nowait())
-                except queue.Empty:
-                    break
-            if not rows:
-                return taken
-            taken += len(rows)
+            if self._held:
+                rows = self._held
+            else:
+                rows = []
+                while len(rows) < self.batch:
+                    try:
+                        rows.append(self._queue.get_nowait())
+                    except queue.Empty:
+                        break
+                if not rows:
+                    return taken
+                taken += len(rows)
             try:
                 self.writer(rows)
-                self.stats.stored += len(rows)
-            except Exception:  # a database failure costs these lines, not the service
-                self.stats.dropped_failed += len(rows)
+            except Exception as exc:  # a database failure must not reach the service
+                self._held_tries += 1
+                self._say(exc, len(rows))
+                if self._held_tries >= self.max_tries:
+                    self.stats.dropped_failed += len(rows)
+                    self._held, self._held_tries = [], 0
+                    continue
+                self._held = rows
+                return taken  # try again next cycle; don't spin
+            self.stats.stored += len(rows)
+            self._held, self._held_tries = [], 0
+
+    def _say(self, exc: Exception, rows: int) -> None:
+        """One line on stderr per failure streak step, at most every 5 s. Type and SQL state only."""
+        now = time.monotonic()
+        if now - self._last_report < 5.0 and self._held_tries > 1:
+            return
+        self._last_report = now
+        cause = getattr(exc, "orig", None)
+        state = getattr(cause, "sqlstate", None)
+        detail = type(exc).__name__ + (f"/{type(cause).__name__}" if cause is not None else "")
+        text = (
+            f"ops log sink ({self.service}): {rows} line(s) not stored yet, try {self._held_tries} of {self.max_tries}:"
+            f" {detail}" + (f", SQL state {state}" if state else "")
+        )
+        with contextlib.suppress(Exception):  # reporting a logging failure must never fail the service
+            (self.report or _stderr)(text)
 
     def start(self, interval: float = 0.5) -> None:
         def loop() -> None:

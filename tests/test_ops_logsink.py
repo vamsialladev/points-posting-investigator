@@ -80,13 +80,69 @@ def test_a_full_queue_drops_lines_and_counts_them_without_raising():
     assert handler.drain() == 3 and [row["message"] for row in writer.rows] == ["line 0", "line 1", "line 2"]
 
 
-def test_a_database_failure_costs_the_lines_not_the_service():
-    handler = logsink.OpsLogHandler("posting", Writer(fail=True), batch=2)
+def test_a_failed_write_keeps_its_lines_and_stores_them_in_order_once_the_database_is_back():
+    """The first version dropped a failed batch at once, silently. During scenario S07 that lost four of six retry
+    lines and left no trace of why (verification log, M3 Phase 2)."""
+    writer, said = Writer(fail=True), []
+    handler = logsink.OpsLogHandler("posting", writer, batch=2, report=said.append)
     logger = logger_with(handler)
     for n in range(5):
         logger.error("line %s", n)  # must not raise
-    assert handler.drain() == 5
-    assert (handler.stats.stored, handler.stats.dropped_failed) == (0, 5)
+    for _ in range(3):
+        handler.drain()  # three cycles while the database is down: nothing raised, nothing lost, nothing spun
+    assert (handler.stats.stored, handler.stats.dropped_failed) == (0, 0)
+    assert said and said[0] == "ops log sink (posting): 2 line(s) not stored yet, try 1 of 20: ConnectionError"
+    writer.fail = False
+    handler.drain()
+    assert [row["message"] for row in writer.rows] == [f"line {n}" for n in range(5)], "all of them, in order"
+    assert (handler.stats.stored, handler.stats.dropped_failed) == (5, 0)
+
+
+def test_a_batch_that_keeps_failing_is_dropped_after_max_tries_and_later_lines_still_get_through():
+    class Picky(Writer):
+        def __call__(self, rows: list[dict]) -> None:
+            if any(row["message"] == "poison" for row in rows):
+                raise ValueError("this batch can never be stored")
+            super().__call__(rows)
+
+    writer, said = Picky(), []
+    handler = logsink.OpsLogHandler("posting", writer, batch=1, max_tries=3, report=said.append)
+    logger = logger_with(handler)
+    logger.info("poison")
+    logger.info("fine")
+    for _ in range(4):
+        handler.drain()
+    assert handler.stats.dropped_failed == 1 and [row["message"] for row in writer.rows] == ["fine"]
+    assert any("try 3 of 3: ValueError" in line for line in said) or len(said) == 1  # reports are throttled
+
+
+def test_the_failure_report_names_the_error_type_and_sql_state_never_the_log_text():
+    class Refused(Exception):  # shaped like a SQLAlchemy error wrapping a driver error
+        def __init__(self) -> None:
+            super().__init__("INSERT ... VALUES ('the secret-looking log line')")
+            self.orig = type("InsufficientPrivilege", (Exception,), {"sqlstate": "42501"})()
+
+    class Failing(Writer):
+        def __call__(self, rows: list[dict]) -> None:
+            raise Refused()
+
+    said: list[str] = []
+    handler = logsink.OpsLogHandler("relay", Failing(), report=said.append)
+    logger_with(handler).warning("the secret-looking log line")
+    handler.drain()
+    assert said == [
+        "ops log sink (relay): 1 line(s) not stored yet, try 1 of 20: Refused/InsufficientPrivilege, SQL state 42501"
+    ]
+
+
+def test_a_reporter_that_fails_does_not_break_the_handler():
+    def broken(_text: str) -> None:
+        raise OSError("stderr is closed")
+
+    handler = logsink.OpsLogHandler("posting", Writer(fail=True), report=broken)
+    logger_with(handler).info("line")
+    handler.drain()  # must not raise
+    assert handler.stats.dropped_failed == 0
 
 
 def test_a_broken_format_string_does_not_raise():
