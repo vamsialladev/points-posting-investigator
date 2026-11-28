@@ -84,9 +84,11 @@ def started() -> datetime:
 
     The scenario before can still be finishing when its reset returns: S11's dead letter reached the topic 0.2 s
     after S13's window had opened, and S13's last posting landed inside S16's (verification log M3 Phase 3 #4 and
-    #7). So wait first, then open the window. The stack's clocks are this host's, so no margin is needed."""
+    #7). So wait first, then open the window. The stack's clocks are this host's. The start is cut to the whole
+    second, because a broker timestamp has whole milliseconds: with the exact time, S05's first event (sent at once)
+    was stamped 0.2 ms "before" its own window and was left out (#8)."""
     time.sleep(SETTLE_SECONDS)
-    return datetime.now(UTC)
+    return datetime.now(UTC).replace(microsecond=0)
 
 
 def rows(effects, base: str, query: str, params: tuple = ()) -> list[tuple]:
