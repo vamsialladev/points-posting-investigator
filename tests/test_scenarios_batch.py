@@ -12,6 +12,7 @@ written to `.scenario-runs/batch/`.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 
@@ -124,14 +125,25 @@ def test_s07_a_posting_database_outage_makes_partitions_wait_and_nothing_is_lost
         print(f"S07: {len(posted)}/{len(events)} posted, {len(in_flight)} credited without a posting row yet")
         assert len(in_flight) <= partitions, "at most one event per partition was past its reads when the cut came"
         assert len(credited) <= len(posted) + partitions, "no event was credited after the database went away"
-        retries = rows(
-            effects,
-            "ops",
-            "SELECT count(*) FROM log_event WHERE service = 'posting' AND level = 'WARNING'"
-            " AND message LIKE %s AND logged_at > now() - interval '2 minutes'",
-            ("retrying %in place after DatabaseFailure%",),
-        )
-        assert retries[0][0] >= 1, "the outage left retry lines in the stored logs"
+        # The retry line can come late: run 46094551526 had none 14 s into the outage, in the one run where no
+        # event was mid-flight at the cut. So wait a bounded time for it, and print what the service did store,
+        # pass or fail (verification log, M3 Phase 2).
+        deadline = time.monotonic() + 45
+        while True:
+            stored = rows(
+                effects,
+                "ops",
+                "SELECT to_char(logged_at, 'HH24:MI:SS.MS'), level, message FROM log_event"
+                " WHERE service = 'posting' AND logged_at > now() - interval '90 seconds' ORDER BY id",
+            )
+            retries = [line for line in stored if line[1] == "WARNING" and "in place after DatabaseFailure" in line[2]]
+            if retries or time.monotonic() > deadline:
+                break
+            time.sleep(1.0)
+        print(f"S07: {len(stored)} stored posting lines in the last 90 s; {len(retries)} are DatabaseFailure retries")
+        for at, level, message in stored[-40:]:
+            print(f"  {at} {level} {message[:140]}")
+        assert retries, "the outage left retry lines in the stored logs (waited up to 45 s)"
     assert_all_posted_and_credited_once(effects, built.manifest.events)
 
 
