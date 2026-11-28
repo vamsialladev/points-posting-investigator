@@ -211,6 +211,20 @@ def test_with_a_password_the_handler_is_installed_at_info_and_started():
     assert [row["message"] for row in writer.rows] == ["stored"]
 
 
+def test_the_insert_only_tables_never_ask_for_the_new_row_back():
+    """`RETURNING` needs SELECT, which the services' role doesn't have. Offline this can only check the setting;
+    tests/test_ops_postgres.py stores single lines as the real role."""
+    from sqlalchemy import insert
+    from sqlalchemy.dialects import postgresql
+
+    from app.ops import tables
+
+    for table in (tables.log_event, tables.alert_evaluation):
+        assert table.implicit_returning is False, table.name
+        compiled = str(insert(table).compile(dialect=postgresql.dialect()))
+        assert "RETURNING" not in compiled, table.name
+
+
 def test_sizes_must_be_positive():
     for bad in ({"capacity": 0}, {"batch": 0}):
         with pytest.raises(ValueError):

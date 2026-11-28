@@ -157,26 +157,23 @@ def test_s07_a_posting_database_outage_makes_partitions_wait_and_nothing_is_lost
         print(f"S07: {len(posted)}/{len(events)} posted, {len(in_flight)} credited without a posting row yet")
         assert len(in_flight) <= partitions, "at most one event per partition was past its reads when the cut came"
         assert len(credited) <= len(posted) + partitions, "no event was credited after the database went away"
-        # The retry line can come late: run 46094551526 had none 14 s into the outage, in the one run where no
-        # event was mid-flight at the cut. So wait a bounded time for it, and print what the service did store,
-        # pass or fail (verification log, M3 Phase 2).
-        deadline = time.monotonic() + 45
-        while True:
-            stored = rows(
-                effects,
-                "ops",
-                "SELECT to_char(logged_at, 'HH24:MI:SS.MS'), level, message FROM log_event"
-                " WHERE service = 'posting' AND logged_at > now() - interval '90 seconds' ORDER BY id",
-            )
-            retries = [line for line in stored if line[1] == "WARNING" and "in place after DatabaseFailure" in line[2]]
-            if retries or time.monotonic() > deadline:
-                break
-            time.sleep(1.0)
+        # The retry lines, checked at once, with no wait. This check failed in two runs while the service was doing
+        # the right thing: its log handler lost single lines (a one-row insert asked for RETURNING, which the
+        # insert-only role may not do). By now the outage is at least 10 s old and the service has retried about
+        # five times with its growing wait, so three stored lines is a floor (verification log, M3 Phase 2).
+        stored = rows(
+            effects,
+            "ops",
+            "SELECT to_char(logged_at, 'HH24:MI:SS.MS'), level, message FROM log_event"
+            " WHERE service = 'posting' AND logged_at > now() - interval '90 seconds' ORDER BY id",
+        )
+        retries = [line for line in stored if line[1] == "WARNING" and "in place after DatabaseFailure" in line[2]]
         print(f"S07: {len(stored)} stored posting lines in the last 90 s; {len(retries)} are DatabaseFailure retries")
-        print(thread_dump("posting"))  # where the service is right now, while its database is unreachable
-        for at, level, message in stored[-40:]:
-            print(f"  {at} {level} {message[:140]}")
-        assert retries, "the outage left retry lines in the stored logs (waited up to 45 s)"
+        if len(retries) < 3:  # only then: what the service logged on its console, and where its threads are
+            print(thread_dump("posting"))
+            for at, level, message in stored[-40:]:
+                print(f"  {at} {level} {message[:140]}")
+        assert len(retries) >= 3, "the outage left the service's retry lines in the stored logs"
     assert_all_posted_and_credited_once(effects, built.manifest.events)
 
 
