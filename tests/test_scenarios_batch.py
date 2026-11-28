@@ -180,8 +180,22 @@ def test_s12_a_lowered_timeout_parks_events_with_a_change_record_just_before(eff
 
 
 def test_s14_a_rebalance_storm_loses_nothing_and_credits_nothing_twice(effects):
+    def rebalance_lines() -> int:
+        found = rows(
+            effects,
+            "ops",
+            "SELECT count(*) FROM log_event WHERE service = 'posting'"
+            " AND (message LIKE 'partitions revoked:%%' OR message LIKE 'partitions assigned:%%')"
+            " AND logged_at > now() - interval '3 minutes'",
+        )
+        return int(found[0][0])
+
+    before = rebalance_lines()
     with triggered(effects, "S14") as built:
-        pass
+        flaps = next(s.times for s in built.trigger if isinstance(s, steps.GroupFlap))
+        # Each join and each leave moves the posting service's partitions at least once. Half of that is asserted,
+        # so a rebalance that covers two changes at once doesn't fail the test.
+        assert rebalance_lines() - before >= flaps, "the storm left assigned and revoked lines in the stored logs"
     assert_all_posted_and_credited_once(effects, built.manifest.events)
 
 

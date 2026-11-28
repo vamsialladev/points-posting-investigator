@@ -223,7 +223,7 @@ class StackEffects:
         with self.connect("ops") as conn:
             conn.execute(
                 "INSERT INTO log_event (service, level, logger, message, correlation_id)"
-                " VALUES ('posting', 'WARNING', 'app.pipeline.posting', %s, %s)",
+                " VALUES ('posting', 'WARNING', 'posting', %s, %s)",  # the posting service's own logger name
                 (step.message, step.correlation_id),
             )
 

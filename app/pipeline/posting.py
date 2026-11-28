@@ -503,8 +503,21 @@ def make_consumer(bootstrap: str, group_id: str, subscribe: list[str], principal
             "enable.auto.offset.store": False,
         }
     )
-    consumer.subscribe(subscribe)
+    # The callbacks only log. They don't call assign() or unassign(), so the client applies the group's assignment
+    # itself, exactly as before.
+    consumer.subscribe(
+        subscribe,
+        on_assign=lambda _consumer, partitions: log_rebalance("assigned", partitions),
+        on_revoke=lambda _consumer, partitions: log_rebalance("revoked", partitions),
+    )
     return consumer
+
+
+def log_rebalance(change: str, partitions: list[Any]) -> None:
+    """One stored line per rebalance, so a storm of them can be seen afterwards (scenario S14). Before this the
+    service logged nothing when its partitions moved."""
+    listed = ", ".join(sorted(f"{p.topic}/{p.partition}" for p in partitions)) or "none"
+    log.info("partitions %s: %s", change, listed)
 
 
 RETRYABLE = (DatabaseFailure, DeadLetterFailure, LedgerTransient)
