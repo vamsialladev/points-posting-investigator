@@ -58,6 +58,23 @@ Already approved:
 **Before Phase 3's first commit,** any correction to a pre-registered file needs
 `uv run python scripts/prereg_lock.py --write` in the same commit. After it, those files don't change.
 
+## Next: Phase 3, and what to settle before its first commit freezes the pre-registration
+- **Every catalog evidence line was audited against the code** (verification log M3 Phase 2 #14l). S07, S13, S14
+  and S06 were corrected. Before the freeze, read the catalog once more against the latest batch output.
+- **Order of work:**
+  1. A read-only evidence layer that both the rules and the investigator use (planned as `app/evidence/`, so it
+     doesn't freeze anything): the database roles `posting_investigator`, `ledger_investigator` and an `ops` reader,
+     with views that leave out raw payload bytes; the Kafka login `investigator` (ADR-0021, already enforced by the
+     broker); typed, bounded reads that return evidence IDs. An event reader must return `occurred_at` next to the
+     broker's timestamp (S13).
+  2. Capture an evidence snapshot per scenario in the batch workflow (after the trigger, before the reset), keep
+     them as an artifact, and commit the 18 dev snapshots as fixtures, so the rules and the mock evaluation run
+     offline in CI.
+  3. Only then `app/arms/rules.py`: a pure function from a snapshot to ranked root-cause codes, cited facts, a
+     recovery code with its message set, and affected members. Its first commit is the freeze.
+- **New database role passwords** will be needed (`INVESTIGATOR_DB_PASSWORD`): `new_env.ps1 -AddMissing` is
+  already approved.
+
 ## Phase 2, piece by piece
 | Piece | State |
 |---|---|
