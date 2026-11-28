@@ -20,6 +20,14 @@ SERVICES = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-
 
 def test_preflight_the_template_and_the_generator_know_the_same_seven_names():
     assert preflight._KAFKA_PASSWORDS == auth.PASSWORD_VARIABLES
+    runner = (ROOT / "scripts" / "run_integration.py").read_text(encoding="utf-8")
+    listed = re.search(r"KAFKA_LOGINS = \((.*?)\)", runner, re.DOTALL)
+    assert listed and tuple(re.findall(r'"(\w+)"', listed.group(1))) == auth.PASSWORD_VARIABLES
+    for workflow in ("ci.yml", "scenario-batch.yml"):
+        text = (ROOT / ".github" / "workflows" / workflow).read_text(encoding="utf-8")
+        loops = [line for line in text.splitlines() if line.strip().startswith("for name in ")]
+        names = [set(line.replace(";", " ").split()) for line in loops]
+        assert names and all(set(auth.PASSWORD_VARIABLES) <= found for found in names), workflow
     template = (ROOT / ".env.example").read_text(encoding="utf-8")
     generator = (ROOT / "scripts" / "new_env.ps1").read_text(encoding="utf-8")
     for name in auth.PASSWORD_VARIABLES:
