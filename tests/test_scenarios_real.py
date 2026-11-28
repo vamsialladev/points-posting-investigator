@@ -2,62 +2,21 @@
 
 A fast subset runs here on every CI run: S01, S02, S05, S11, S13, S16. Each asserts the evidence the pre-registered
 catalog says the scenario leaves, read from the databases and the dead-letter topic. The slower scenarios (restarts,
-a database outage, a rebalance storm) are run in a batch on the owner's machine (verification log).
+a database outage, a rebalance storm) are in tests/test_scenarios_batch.py, which the "Scenario batch" workflow runs.
 
-Needs TEST_DATABASE_URL, TEST_KAFKA_BOOTSTRAP_SERVERS, TEST_SCHEMA_REGISTRY_URL, TEST_LEDGER_URL, TEST_LEDGER_TOKEN
-(scripts\\test_integration.ps1 sets them without printing them). These tests write synthetic rows into the stack's own
-databases, in blocks of members and stays no other test or demo run uses.
+The `effects` fixture and the helpers are in tests/scenario_helpers.py. These tests write synthetic rows into the
+stack's own databases, in blocks of members and stays no other test or demo run uses.
 """
 
 from __future__ import annotations
-
-import os
 
 import pytest
 
 from app.scenarios import plans, run, steps
 from app.scenarios.executor import Executor
+from tests.scenario_helpers import credits_for, free_run, rows
 
 pytestmark = [pytest.mark.postgres, pytest.mark.kafka]
-RUNS_FOR_TESTS = range(plans.MAX_RUN, 5, -1)  # the top of the range; demo runs count up from 0
-MAPPING = {
-    "DATABASE_URL": "TEST_DATABASE_URL",
-    "KAFKA_BOOTSTRAP_SERVERS": "TEST_KAFKA_BOOTSTRAP_SERVERS",
-    "SCHEMA_REGISTRY_URL": "TEST_SCHEMA_REGISTRY_URL",
-    "LEDGER_API_URL": "TEST_LEDGER_URL",
-    "LEDGER_API_TOKEN": "TEST_LEDGER_TOKEN",
-}
-
-
-@pytest.fixture(scope="module")
-def effects():
-    env = {name: os.environ.get(source, "") for name, source in MAPPING.items()}
-    missing = [MAPPING[name] for name, value in env.items() if not value]
-    if missing:
-        pytest.skip(f"{', '.join(missing)} not set: run scripts\\stack.ps1 up, then scripts\\test_integration.ps1")
-    return run.stack_effects(env)
-
-
-def rows(effects, base: str, query: str, params: tuple = ()) -> list[tuple]:
-    with effects.connect(base) as conn:
-        return conn.execute(query, params).fetchall()
-
-
-def free_run(effects, scenario: str) -> int:
-    """The first run of this scenario that left nothing on this stack yet, so the trigger behaves as on a new one."""
-    for number in RUNS_FOR_TESTS:
-        manifest = plans.plan(scenario, number).manifest
-        ids = [event.event_id for event in manifest.events]
-        if ids:
-            used = rows(effects, "posting", "SELECT 1 FROM posting WHERE event_id = ANY(%s) LIMIT 1", (ids,))
-            used += rows(effects, "posting", "SELECT 1 FROM parked_event WHERE event_id = ANY(%s) LIMIT 1", (ids,))
-            used += [1] if set(ids) & effects.kafka.dead_letter_event_ids() else []
-        else:
-            member = manifest.affected[0].member_number
-            used = rows(effects, "ops", "SELECT 1 FROM member_question WHERE member_number = %s LIMIT 1", (member,))
-        if not used:
-            return number
-    pytest.fail(f"every test run of {scenario} is used on this stack: scripts\\stack.ps1 reset clears it (ask first)")
 
 
 def trigger_then_reset(effects, scenario: str, tmp_path) -> plans.Plan:
@@ -69,15 +28,6 @@ def trigger_then_reset(effects, scenario: str, tmp_path) -> plans.Plan:
                          executor=Executor(effects, poll_seconds=0.5))  # fmt: skip
         assert ok, "\n".join(said)
     return built
-
-
-def credits_for(effects, events) -> dict[str, int]:
-    keys = [f"{event.stay_id}:{event.revision}" for event in events]
-    found = rows(effects, "ledger", "SELECT idempotency_key FROM credits WHERE idempotency_key = ANY(%s)", (keys,))
-    counts: dict[str, int] = {}
-    for (key,) in found:
-        counts[key] = counts.get(key, 0) + 1
-    return counts
 
 
 def test_s01_bad_events_are_dead_lettered_at_once_and_never_posted_or_credited(effects, tmp_path):
