@@ -541,6 +541,16 @@ class PostingConsumer:
             # Nothing committed: go back to this same message and try again after a growing, jittered wait.
             self.consumer.seek(TopicPartition(incoming.topic, incoming.partition, incoming.offset))
             self.consecutive_failures += 1
+            # One line per retry, with the failure's type only: before this, a database outage left no log line at
+            # all (found by the scenario batch, S07). The wait below grows, so the lines thin out by themselves.
+            log.warning(
+                "retrying %s/%s@%s in place after %s (attempt %s)",
+                incoming.topic,
+                incoming.partition,
+                incoming.offset,
+                type(failure).__name__,
+                self.consecutive_failures,
+            )
             config = getattr(self.service, "config", PostingConfig())
             step = min(config.retry_cap, config.retry_base * 2 ** (self.consecutive_failures - 1))
             self.sleep(step / 2 + self.rand() * step / 2)

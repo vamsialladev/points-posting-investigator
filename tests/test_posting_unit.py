@@ -379,11 +379,15 @@ def test_the_offset_is_committed_after_the_service_returns(outcome):
 @pytest.mark.parametrize(
     "failure", [DatabaseFailure("connection lost"), LedgerTransient("unavailable_503"), DeadLetterFailure("down")]
 )
-def test_a_retryable_failure_seeks_back_and_commits_nothing(failure):
+def test_a_retryable_failure_seeks_back_and_commits_nothing(failure, caplog):
     posting, _, consumer, sleeps = loop(failure)
-    assert posting.run_once() is Outcome.RETRY
+    with caplog.at_level("WARNING", logger="app.pipeline.posting"):
+        assert posting.run_once() is Outcome.RETRY
     assert consumer.commits == [] and consumer.seeks == [("stay.checked_out", 1, 7)]
     assert sleeps and sleeps[0] > 0
+    # The retry leaves a log line naming the failure's type and the message, never the failure's text (S07).
+    (line,) = [record.getMessage() for record in caplog.records]
+    assert line == f"retrying stay.checked_out/1@7 in place after {type(failure).__name__} (attempt 1)"
 
 
 def test_retry_waits_grow_and_reset_after_a_success():

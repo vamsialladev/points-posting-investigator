@@ -120,8 +120,19 @@ Kept current at every milestone. Each line says what is limited, why, and what w
 - **The order test needs full git history.** It fails on a shallow clone, by design; CI's `checks` job now fetches
   everything.
 - **The ledger `members` table moves to v2** (ADR-0019): no pre-registered scenario needs an unknown member.
-- **Twelve of the 18 scenarios have not run on a real stack yet** (S03, S04, S06 to S10, S12, S14, S15, S17, S18).
-  Their plans and side effects are tested with fakes only. CI runs the other six.
+- **The 18 scenarios have run on GitHub's runners, not on the owner's machine.** Six run in the required CI job and
+  twelve in the "Scenario batch" workflow. A slower or busier machine can behave differently (verification log M3
+  #7 shows one such case), so a local run is still worth doing when the laptop is free.
+- **Two passing runs were not enough to trust a scenario check.** S07's first assertion depended on timing and
+  failed on the third run (verification log M3 Phase 2 #14c). Other batch checks have run three or four times;
+  that is evidence of stability on GitHub's runners, not proof.
+- **The posting service's retry line names the failure's type, not its cause.** "DatabaseFailure" doesn't say
+  whether the role lost its login, the server is down or a query failed.
+- **The batch workflow is not a required check.** It runs when scenario, pipeline, compose or migration files
+  change, and on demand. A change elsewhere that breaks a slow scenario is caught only at the next batch run.
+- **The batch's waits are tuned to GitHub's runners.** S15 pair A needed 59 s and then 89 s for ten outbox rows
+  while the ledger was rate limited. Its limit was 120 s and is now 300 s; other waits may be as tight on a slower
+  machine.
 - **Stored logs are the minimal version.** Lines are cut at 500 characters and carry IDs only where the service
   passes them; today's services mostly log plain messages. A redaction filter and trace IDs on every line are M4.
 - **A scenario's planted log line is written by the trigger, not by a service.** It is labelled as coming from the
