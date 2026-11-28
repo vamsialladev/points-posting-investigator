@@ -7,7 +7,9 @@ printing them); without them it skips, and under REQUIRE_MARKERS a skip is a fai
 
 from __future__ import annotations
 
+import json
 import os
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -30,6 +32,50 @@ def effects():
     if missing:
         pytest.skip(f"{', '.join(missing)} not set: run scripts\\stack.ps1 up, then scripts\\test_integration.ps1")
     return run.stack_effects(env)
+
+
+@pytest.fixture(scope="session")
+def evidence_readers(effects):
+    """(EvidenceStore, TopicReader) on the stack, logged in as the read-only roles and the `investigator` Kafka
+    login. A missing login is a skip, which is a failure under REQUIRE_MARKERS."""
+    from sqlalchemy.engine import make_url
+
+    from app.evidence.snapshot import reader_from_env
+    from app.evidence.store import EvidenceStore, engines_from_env
+
+    needed = ("INVESTIGATOR_DB_PASSWORD", "KAFKA_INVESTIGATOR_PASSWORD")
+    missing = [name for name in needed if not os.environ.get(name)]
+    if missing:
+        pytest.skip(f"{', '.join(missing)} not set: the stack's read-only logins are needed to read evidence")
+    admin = make_url(os.environ["TEST_DATABASE_URL"])
+    env = {
+        "INVESTIGATOR_DB_PASSWORD": os.environ["INVESTIGATOR_DB_PASSWORD"],
+        "KAFKA_INVESTIGATOR_PASSWORD": os.environ["KAFKA_INVESTIGATOR_PASSWORD"],
+        "POSTGRES_HOST": admin.host or "127.0.0.1",
+        "POSTGRES_PORT": str(admin.port or 5432),
+        "KAFKA_BOOTSTRAP_SERVERS": os.environ["TEST_KAFKA_BOOTSTRAP_SERVERS"],
+        "SCHEMA_REGISTRY_URL": os.environ["TEST_SCHEMA_REGISTRY_URL"],
+    }
+    return EvidenceStore(engines_from_env(env)), reader_from_env(env)
+
+
+def capture(evidence_readers, name: str, since: datetime):
+    """Take a read-only snapshot of the evidence since `since` and keep it under `.scenario-runs/evidence/`, where
+    the workflow uploads it. Returns the snapshot."""
+    from app.evidence.snapshot import collect
+
+    store, reader = evidence_readers
+    snapshot = collect(store, reader, since)
+    folder = run.RUNS_DIR / "evidence"
+    folder.mkdir(parents=True, exist_ok=True)
+    text = json.dumps({"scenario_run": name, **snapshot.to_json()}, indent=2, default=str)
+    (folder / f"{name}.json").write_text(text + "\n", encoding="utf-8", newline="\n")
+    return snapshot
+
+
+def started() -> datetime:
+    """A moment just before a trigger: the start of the window its evidence is read from."""
+    return datetime.now(UTC) - timedelta(seconds=5)
 
 
 def rows(effects, base: str, query: str, params: tuple = ()) -> list[tuple]:

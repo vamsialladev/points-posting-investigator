@@ -3,6 +3,16 @@
 Real results only, newest milestone first. Each row: what was checked, the exact command, and the result. Tool: Claude
 Code (Opus 5.5) did all of Milestone 1 and Milestone 2. Claude Code (Fable 5.2) does Milestone 3 onwards (RFC-0002).
 
+## Milestone 3, Phase 3: the read-only evidence layer, snapshots, the rules baseline (2026-11-28 onwards)
+RFC-0002 Phase 3. Real-stack rows are GitHub Actions runs: by the owner's decision (2026-11-28) there is no local
+scenario batch. **No stack has run on the owner's laptop in this phase.** $0, no AI.
+
+| # | Check | Command | Result |
+|---|---|---|---|
+| 1 | Offline suite with the read-only roles and `app/evidence/` (commit `19c2871`) | `scripts\test.ps1` | 607 passed, 139 skipped; ruff and mypy clean |
+| 2 | The local `.env` has the new reader login; no value printed | `scripts\new_env.ps1 -AddMissing`, then `scripts\preflight.ps1 -Profile core` | "Added 1 generated local value(s): INVESTIGATOR_DB_PASSWORD"; READY |
+| 3 | Offline suite with snapshot capture wired into the scenario tests and the new S13 skew test (skipped offline) | `uv run pytest --cov`, `uv run pytest -rs`; output in `.test-logs\phase3-evidence-offline*.txt` | 607 passed, 140 skipped; coverage 82.19% (gate 80%); ruff and mypy clean |
+
 ## Milestone 3, Phase 2: scenarios, the evidence store, the batch, Kafka logins (2026-11-27 onwards)
 RFC-0002 Phase 2, over PRs #13 to #17. The rows are in time order: the early ones are offline only; from #11 on,
 scenarios run on a real stack in GitHub Actions. **No stack has run on the owner's laptop in this phase** (it was in

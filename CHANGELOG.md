@@ -110,6 +110,13 @@ All notable changes to this project are documented here. The format follows
   `tests/test_kafka_acls_real.py`).
 - The "Scenario batch" workflow (GitHub Actions, not a required check): the 12 slow scenarios triggered, checked
   and reset on a real stack (`tests/test_scenarios_batch.py`, `scripts\test_integration.ps1 --batch`).
+- The read-only evidence layer (RFC-0002 Phase 3, ADR-0022):
+  - database roles `posting_investigator`, `ledger_investigator` and `ops_investigator`: SELECT only, read-only
+    transactions by default, and no access to a parked event's raw bytes (`INVESTIGATOR_DB_PASSWORD`)
+  - `app/evidence/`: ten fixed, bounded reads that return evidence with citation IDs; a topic reader that logs in
+    as `investigator` and shows an event's own time next to the broker's; `python -m app.evidence.snapshot`
+  - every scenario test takes an evidence snapshot after its trigger; both workflows upload them
+  - a test reads S13's clock skew from the topic
 
 ### Changed
 - CI's `checks` job fetches the full history, so the pre-registration order test can read it.

@@ -73,6 +73,7 @@ jobs:
           name: scenario-batch-${{ github.run_id }}
           path: |
             .scenario-runs/batch/
+            .scenario-runs/evidence/
             scenario-batch-stack-logs.txt
           include-hidden-files: true
           if-no-files-found: warn

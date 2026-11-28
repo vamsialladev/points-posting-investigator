@@ -21,11 +21,17 @@ import pytest
 
 from app.scenarios import catalog, plans, run, steps
 from app.scenarios.executor import Executor
-from tests.scenario_helpers import credits_for, free_run, rows
+from tests.scenario_helpers import capture, credits_for, free_run, rows, started
 
 pytestmark = [pytest.mark.postgres, pytest.mark.kafka, pytest.mark.batch]
 MANIFESTS = run.RUNS_DIR / "batch"
 OPEN = ("pending", "in_flight")
+READERS: dict[str, object] = {}
+
+
+@pytest.fixture(autouse=True)
+def _read_only_logins(evidence_readers):
+    READERS["stack"] = evidence_readers
 
 
 def phase(effects, name: str, built: steps.Plan) -> None:
@@ -39,10 +45,14 @@ def phase(effects, name: str, built: steps.Plan) -> None:
 
 @contextmanager
 def triggered(effects, scenario: str, pair: str | None = None) -> Iterator[steps.Plan]:
-    """Trigger, hand over for the checks made while the fault is in place, and always reset afterwards."""
+    """Trigger, take a read-only evidence snapshot (kept for the workflow to upload), hand over for the checks made
+    while the fault is in place, and always reset afterwards."""
     built = plans.plan(scenario, free_run(effects, scenario), pair)
+    name = f"{scenario}{'-' + pair if pair else ''}-run{built.manifest.run}"
+    since = started()
     try:
         phase(effects, "trigger", built)
+        capture(READERS["stack"], name, since)
         yield built
     finally:
         phase(effects, "reset", built)
