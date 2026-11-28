@@ -114,4 +114,5 @@ here. **Stage 9 (`..\loyalty-support-modernization`) is read-only:** read it, re
 - Two GitHub accounts are signed in to `gh`. When pushing, use
   `git -c credential.helper= -c "credential.helper=!gh auth git-credential" push` so the vamsialladev credential is
   used.
-- Never use shell heredocs containing backslashes on Windows; write files with the editor tools instead.
+- **Never use shell heredocs to write or edit a file, with or without backslashes. Edit files with the file tools
+  only** (owner's rule, 2026-11-27, after a heredoc broke `docker-compose.yml`; verification log M3 Phase 2 #9).
