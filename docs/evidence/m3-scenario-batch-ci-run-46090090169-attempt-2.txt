@@ -1,0 +1,249 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/runner/work/points-posting-investigator/points-posting-investigator
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.16.0, platformdirs-4.14.5, cov-7.1.0
+collected 682 items / 668 deselected / 14 selected
+
+tests/test_scenarios_batch.py trigger S03 run 12: 3 step(s)
+  LedgerControl       0.1 s
+  SendEvents          1.5 s  sent 4
+  WaitFor            14.7 s  parked_open = 1
+ok; manifest: batch/S03-run12.json
+reset S03 run 12: 5 step(s)
+  LedgerControl       0.0 s
+  WaitFor             1.0 s  parked_open = 0
+  WaitFor             5.1 s  lag = 0
+  WaitFor             0.0 s  outbox_unpublished = 0
+  WaitFor             1.0 s  0 of 4 not yet posted
+ok; manifest: batch/S03-run12.json
+.trigger S04 run 12: 3 step(s)
+  LedgerControl       0.0 s
+  SendEvents          1.1 s  sent 12
+  WaitFor             0.0 s  parked_open = 11
+ok; manifest: batch/S04-run12.json
+reset S04 run 12: 5 step(s)
+  LedgerControl       0.0 s
+  WaitFor             5.1 s  parked_open = 0
+  WaitFor             0.0 s  lag = 0
+  WaitFor             0.5 s  outbox_unpublished = 0
+  WaitFor             0.0 s  0 of 12 not yet posted
+ok; manifest: batch/S04-run12.json
+ Container points-posting-posting-1  Restarting
+ Container points-posting-posting-1  Started
+.trigger S06 run 12: 4 step(s)
+  SendEvents          0.0 s  sending in the background
+  Wait                1.0 s  events are flowing
+  Compose             0.4 s
+  JoinSends           1.5 s  joined 1
+ok; manifest: batch/S06-run12.json
+reset S06 run 12: 4 step(s)
+  WaitFor             0.0 s  parked_open = 0
+  WaitFor             0.0 s  lag = 0
+  WaitFor             0.5 s  outbox_unpublished = 0
+  WaitFor             0.0 s  0 of 30 not yet posted
+ok; manifest: batch/S06-run12.json
+.trigger S07 run 12: 5 step(s)
+  SendEvents          0.0 s  sending in the background
+  Wait                1.0 s  events are flowing
+  RoleLogin           0.0 s
+  JoinSends           2.8 s  joined 1
+  Wait               10.0 s  the posting database stays unreachable
+ok; manifest: batch/S07-run12.json
+reset S07 run 12: 5 step(s)
+  RoleLogin           0.0 s
+  WaitFor             0.0 s  parked_open = 0
+  WaitFor             8.1 s  lag = 0
+  WaitFor             0.0 s  outbox_unpublished = 0
+  WaitFor             0.0 s  0 of 20 not yet posted
+ok; manifest: batch/S07-run12.json
+.trigger S08 run 12: 3 step(s)
+  LedgerControl       0.0 s
+  SendEvents          1.4 s  sent 8
+  WaitFor             0.0 s  parked_open = 7
+ok; manifest: batch/S08-run12.json
+reset S08 run 12: 5 step(s)
+  LedgerControl       0.0 s
+  WaitFor             1.5 s  parked_open = 0
+  WaitFor             0.0 s  lag = 0
+  WaitFor             0.5 s  outbox_unpublished = 0
+  WaitFor             0.0 s  0 of 8 not yet posted
+ok; manifest: batch/S08-run12.json
+.trigger S09 run 12: 3 step(s)
+  LedgerControl       0.0 s
+  SendEvents          3.0 s  sent 60
+  WaitFor             0.0 s  lag = 53
+ok; manifest: batch/S09-run12.json
+reset S09 run 12: 5 step(s)
+  LedgerControl       0.0 s
+  WaitFor             0.0 s  parked_open = 0
+  WaitFor             1.0 s  lag = 0
+  WaitFor             0.0 s  outbox_unpublished = 0
+  WaitFor             0.0 s  0 of 60 not yet posted
+ok; manifest: batch/S09-run12.json
+ Container points-posting-relay-1  Stopping
+ Container points-posting-relay-1  Stopped
+ Container points-posting-kafka-1  Waiting
+ Container points-posting-db-1  Waiting
+ Container points-posting-kafka-1  Waiting
+ Container points-posting-db-1  Healthy
+ Container points-posting-db-init-1  Starting
+ Container points-posting-kafka-1  Healthy
+ Container points-posting-kafka-1  Healthy
+ Container points-posting-kafka-init-1  Starting
+ Container points-posting-db-init-1  Started
+ Container points-posting-kafka-init-1  Started
+ Container points-posting-schema-registry-1  Waiting
+ Container points-posting-db-init-1  Waiting
+ Container points-posting-kafka-init-1  Waiting
+ Container points-posting-schema-registry-1  Healthy
+ Container points-posting-kafka-init-1  Exited
+ Container points-posting-db-init-1  Exited
+ Container points-posting-relay-1  Starting
+ Container points-posting-relay-1  Started
+.trigger S10 run 12: 3 step(s)
+  Compose             0.2 s
+  SendEvents          1.8 s  sent 10
+  WaitFor             0.5 s  outbox_unpublished = 10
+ok; manifest: batch/S10-run12.json
+reset S10 run 12: 4 step(s)
+  Compose             1.8 s
+  WaitFor             0.0 s  parked_open = 0
+  WaitFor             0.0 s  lag = 0
+  WaitFor             1.0 s  outbox_unpublished = 0
+ok; manifest: batch/S10-run12.json
+ Container points-posting-posting-1  Recreate
+ Container points-posting-retry-worker-1  Recreate
+ Container points-posting-retry-worker-1  Recreated
+ Container points-posting-posting-1  Recreated
+ Container points-posting-posting-1  Starting
+ Container points-posting-retry-worker-1  Starting
+ Container points-posting-posting-1  Started
+ Container points-posting-retry-worker-1  Started
+ Container points-posting-retry-worker-1  Waiting
+ Container points-posting-posting-1  Waiting
+ Container points-posting-retry-worker-1  Healthy
+ Container points-posting-posting-1  Healthy
+ Container points-posting-posting-1  Recreate
+ Container points-posting-retry-worker-1  Recreate
+ Container points-posting-retry-worker-1  Recreated
+ Container points-posting-posting-1  Recreated
+ Container points-posting-posting-1  Starting
+ Container points-posting-retry-worker-1  Starting
+ Container points-posting-posting-1  Started
+ Container points-posting-retry-worker-1  Started
+ Container points-posting-retry-worker-1  Waiting
+ Container points-posting-posting-1  Waiting
+ Container points-posting-posting-1  Healthy
+ Container points-posting-retry-worker-1  Healthy
+.trigger S12 run 12: 4 step(s)
+  RecordChange        0.0 s
+  Compose             3.4 s
+  SendEvents          1.4 s  sent 8
+  WaitFor             0.0 s  parked_open = 1
+ok; manifest: batch/S12-run12.json
+reset S12 run 12: 6 step(s)
+  RecordChange        0.0 s
+  Compose             3.3 s
+  WaitFor             0.0 s  parked_open = 0
+  WaitFor             0.0 s  lag = 0
+  WaitFor             0.0 s  outbox_unpublished = 0
+  WaitFor             0.0 s  0 of 8 not yet posted
+ok; manifest: batch/S12-run12.json
+.trigger S14 run 12: 3 step(s)
+  SendEvents          0.0 s  sending in the background
+  GroupFlap          30.3 s  joined and left 6 times
+  JoinSends           0.0 s  joined 1
+ok; manifest: batch/S14-run12.json
+reset S14 run 12: 4 step(s)
+  WaitFor             0.0 s  parked_open = 0
+  WaitFor             0.0 s  lag = 0
+  WaitFor             0.0 s  outbox_unpublished = 0
+  WaitFor             0.0 s  0 of 40 not yet posted
+ok; manifest: batch/S14-run12.json
+ Container points-posting-relay-1  Stopping
+ Container points-posting-relay-1  Stopped
+ Container points-posting-kafka-1  Waiting
+ Container points-posting-db-1  Waiting
+ Container points-posting-kafka-1  Waiting
+ Container points-posting-kafka-1  Healthy
+ Container points-posting-kafka-1  Healthy
+ Container points-posting-db-1  Healthy
+ Container points-posting-kafka-init-1  Starting
+ Container points-posting-db-init-1  Starting
+ Container points-posting-db-init-1  Started
+ Container points-posting-kafka-init-1  Started
+ Container points-posting-schema-registry-1  Waiting
+ Container points-posting-db-init-1  Waiting
+ Container points-posting-kafka-init-1  Waiting
+ Container points-posting-kafka-init-1  Exited
+ Container points-posting-schema-registry-1  Healthy
+ Container points-posting-db-init-1  Exited
+ Container points-posting-relay-1  Starting
+ Container points-posting-relay-1  Started
+.trigger S15 pair A run 12: 6 step(s)
+  LedgerControl       0.0 s
+  SendEvents          1.1 s  sent 12
+  WaitFor             0.0 s  parked_open = 11
+  Compose             0.2 s
+  SendEvents          1.8 s  sent 10
+  WaitFor            89.2 s  outbox_unpublished = 10
+ok; manifest: batch/S15-A-run12.json
+reset S15 pair A run 12: 9 step(s)
+  Compose             1.8 s
+  LedgerControl       0.0 s
+  WaitFor            45.2 s  parked_open = 0
+  WaitFor             0.0 s  lag = 0
+  WaitFor             0.5 s  outbox_unpublished = 0
+  WaitFor             0.0 s  0 of 12 not yet posted
+  WaitFor             0.0 s  parked_open = 0
+  WaitFor             0.0 s  lag = 0
+  WaitFor             0.0 s  outbox_unpublished = 0
+ok; manifest: batch/S15-A-run12.json
+.trigger S15 pair B run 11: 8 step(s)
+  SendEvents          0.0 s  sent 1
+  Wait                2.0 s  the correction is parked before its original arrives
+  SendEvents          0.6 s  sent 4
+  WaitFor            10.4 s  0 of 1 not yet dead_lettered
+  WaitFor             0.0 s  0 of 4 not yet posted
+  SendEvents          2.2 s  sent 12
+  WaitFor             0.1 s  0 of 6 not yet dead_lettered
+  WaitFor             0.0 s  0 of 6 not yet posted
+ok; manifest: batch/S15-B-run11.json
+reset S15 pair B run 11: 6 step(s)
+  WaitFor             0.0 s  parked_open = 0
+  WaitFor             0.0 s  lag = 0
+  WaitFor             0.0 s  outbox_unpublished = 0
+  WaitFor             0.0 s  parked_open = 0
+  WaitFor             0.0 s  lag = 0
+  WaitFor             0.0 s  outbox_unpublished = 0
+ok; manifest: batch/S15-B-run11.json
+.trigger S17 run 12: 5 step(s)
+  PlantRunbook        0.0 s
+  SendEvents          1.2 s  sent 7
+  WaitFor            13.9 s  0 of 1 not yet dead_lettered
+  WaitFor             0.0 s  0 of 6 not yet posted
+  PlantLog            0.0 s
+ok; manifest: batch/S17-run12.json
+reset S17 run 12: 4 step(s)
+  RemoveRunbook       0.0 s
+  WaitFor             0.0 s  parked_open = 0
+  WaitFor             0.0 s  lag = 0
+  WaitFor             0.5 s  outbox_unpublished = 0
+ok; manifest: batch/S17-run12.json
+.trigger S18 run 12: 7 step(s)
+  SendEvents          1.0 s  sent 20
+  WaitFor             0.5 s  0 of 20 not yet posted
+  WaitFor             0.0 s  parked_open = 0
+  WaitFor             0.0 s  lag = 0
+  WaitFor             0.0 s  outbox_unpublished = 0
+  Wait               45.0 s  the quiet period the alert rule looks back over
+  EvaluateAlerts      0.0 s  firing: postings_dropped
+ok; manifest: batch/S18-run12.json
+reset S18 run 12: 0 step(s)
+ok; manifest: batch/S18-run12.json
+..
+
+================ 14 passed, 668 deselected in 326.55s (0:05:26) ================
+stack settings: 6/6 set

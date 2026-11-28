@@ -125,8 +125,9 @@ Kept current at every milestone. Each line says what is limited, why, and what w
   #7 shows one such case), so a local run is still worth doing when the laptop is free.
 - **The batch workflow is not a required check.** It runs when scenario, pipeline, compose or migration files
   change, and on demand. A change elsewhere that breaks a slow scenario is caught only at the next batch run.
-- **The batch's waits are tuned to GitHub's runners.** S15 pair A needed 59 s for ten outbox rows while the ledger
-  was rate limited; its timeout is 120 s.
+- **The batch's waits are tuned to GitHub's runners.** S15 pair A needed 59 s and then 89 s for ten outbox rows
+  while the ledger was rate limited. Its limit was 120 s and is now 300 s; other waits may be as tight on a slower
+  machine.
 - **Stored logs are the minimal version.** Lines are cut at 500 characters and carry IDs only where the service
   passes them; today's services mostly log plain messages. A redaction filter and trace IDs on every line are M4.
 - **A scenario's planted log line is written by the trigger, not by a service.** It is labelled as coming from the
