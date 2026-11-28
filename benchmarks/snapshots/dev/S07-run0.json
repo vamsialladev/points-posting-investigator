@@ -1,0 +1,1224 @@
+{
+  "scenario_run": "S07-run0",
+  "taken_at": "2026-11-28T14:09:50.743486+00:00",
+  "since": "2026-11-28T14:09:36+00:00",
+  "truncated": [],
+  "items": [
+    {
+      "id": "posting:e12177c3-6884-57e7-bd4b-8e4b5bc78ba4",
+      "kind": "posting",
+      "at": "2026-11-28T14:09:36.952286+00:00",
+      "data": {
+        "stay_id": "BR-0340",
+        "revision": 1,
+        "member_number": "GR-30300",
+        "stay_points": 1500,
+        "credited_points": 1500,
+        "ledger_entry_id": "L-0000049",
+        "correlation_id": "corr-e12177c3"
+      }
+    },
+    {
+      "id": "posting:8991b853-0a9f-5a85-9fbb-d0d0c0351fcc",
+      "kind": "posting",
+      "at": "2026-11-28T14:09:37.151972+00:00",
+      "data": {
+        "stay_id": "ML-0340",
+        "revision": 1,
+        "member_number": "GR-30301",
+        "stay_points": 3020,
+        "credited_points": 3020,
+        "ledger_entry_id": "L-0000050",
+        "correlation_id": "corr-8991b853"
+      }
+    },
+    {
+      "id": "posting:0ae39fce-312a-5818-9479-523cd9667d9f",
+      "kind": "posting",
+      "at": "2026-11-28T14:09:37.352264+00:00",
+      "data": {
+        "stay_id": "BR-0341",
+        "revision": 1,
+        "member_number": "GR-30302",
+        "stay_points": 4560,
+        "credited_points": 4560,
+        "ledger_entry_id": "L-0000051",
+        "correlation_id": "corr-0ae39fce"
+      }
+    },
+    {
+      "id": "posting:3b869769-f339-51ba-9de5-fbc7da677934",
+      "kind": "posting",
+      "at": "2026-11-28T14:09:37.555136+00:00",
+      "data": {
+        "stay_id": "ML-0341",
+        "revision": 1,
+        "member_number": "GR-30303",
+        "stay_points": 6120,
+        "credited_points": 6120,
+        "ledger_entry_id": "L-0000052",
+        "correlation_id": "corr-3b869769"
+      }
+    },
+    {
+      "id": "posting:9223954a-9e6e-5340-924a-046e9c3bde43",
+      "kind": "posting",
+      "at": "2026-11-28T14:09:37.754242+00:00",
+      "data": {
+        "stay_id": "BR-0342",
+        "revision": 1,
+        "member_number": "GR-30304",
+        "stay_points": 1540,
+        "credited_points": 1540,
+        "ledger_entry_id": "L-0000053",
+        "correlation_id": "corr-9223954a"
+      }
+    },
+    {
+      "id": "posting:079633c7-eaa6-5b41-84ff-aa97da83310b",
+      "kind": "posting",
+      "at": "2026-11-28T14:09:37.953693+00:00",
+      "data": {
+        "stay_id": "ML-0342",
+        "revision": 1,
+        "member_number": "GR-30305",
+        "stay_points": 3100,
+        "credited_points": 3100,
+        "ledger_entry_id": "L-0000054",
+        "correlation_id": "corr-079633c7"
+      }
+    },
+    {
+      "id": "outbox:47",
+      "kind": "outbox",
+      "at": "2026-11-28T14:09:36.952286+00:00",
+      "data": {
+        "topic": "points.posted",
+        "message_key": "GR-30300",
+        "status": "published",
+        "attempts": 0,
+        "last_error": null,
+        "published_at": "2026-11-28T14:09:37.212079+00:00",
+        "dead_at": null
+      }
+    },
+    {
+      "id": "outbox:48",
+      "kind": "outbox",
+      "at": "2026-11-28T14:09:37.151972+00:00",
+      "data": {
+        "topic": "points.posted",
+        "message_key": "GR-30301",
+        "status": "published",
+        "attempts": 0,
+        "last_error": null,
+        "published_at": "2026-11-28T14:09:37.212079+00:00",
+        "dead_at": null
+      }
+    },
+    {
+      "id": "outbox:49",
+      "kind": "outbox",
+      "at": "2026-11-28T14:09:37.352264+00:00",
+      "data": {
+        "topic": "points.posted",
+        "message_key": "GR-30302",
+        "status": "published",
+        "attempts": 0,
+        "last_error": null,
+        "published_at": "2026-11-28T14:09:37.721332+00:00",
+        "dead_at": null
+      }
+    },
+    {
+      "id": "outbox:50",
+      "kind": "outbox",
+      "at": "2026-11-28T14:09:37.555136+00:00",
+      "data": {
+        "topic": "points.posted",
+        "message_key": "GR-30303",
+        "status": "published",
+        "attempts": 0,
+        "last_error": null,
+        "published_at": "2026-11-28T14:09:37.721332+00:00",
+        "dead_at": null
+      }
+    },
+    {
+      "id": "outbox:51",
+      "kind": "outbox",
+      "at": "2026-11-28T14:09:37.754242+00:00",
+      "data": {
+        "topic": "points.posted",
+        "message_key": "GR-30304",
+        "status": "published",
+        "attempts": 0,
+        "last_error": null,
+        "published_at": "2026-11-28T14:09:38.231707+00:00",
+        "dead_at": null
+      }
+    },
+    {
+      "id": "outbox:52",
+      "kind": "outbox",
+      "at": "2026-11-28T14:09:37.953693+00:00",
+      "data": {
+        "topic": "points.posted",
+        "message_key": "GR-30305",
+        "status": "published",
+        "attempts": 0,
+        "last_error": null,
+        "published_at": "2026-11-28T14:09:38.231707+00:00",
+        "dead_at": null
+      }
+    },
+    {
+      "id": "credit:L-0000049",
+      "kind": "credit",
+      "at": "2026-11-28T14:09:36.949774+00:00",
+      "data": {
+        "idempotency_key": "BR-0340:1",
+        "member_number": "GR-30300",
+        "stay_id": "BR-0340",
+        "points": 1500,
+        "correlation_id": "corr-e12177c3"
+      }
+    },
+    {
+      "id": "credit:L-0000050",
+      "kind": "credit",
+      "at": "2026-11-28T14:09:37.149429+00:00",
+      "data": {
+        "idempotency_key": "ML-0340:1",
+        "member_number": "GR-30301",
+        "stay_id": "ML-0340",
+        "points": 3020,
+        "correlation_id": "corr-8991b853"
+      }
+    },
+    {
+      "id": "credit:L-0000051",
+      "kind": "credit",
+      "at": "2026-11-28T14:09:37.349594+00:00",
+      "data": {
+        "idempotency_key": "BR-0341:1",
+        "member_number": "GR-30302",
+        "stay_id": "BR-0341",
+        "points": 4560,
+        "correlation_id": "corr-0ae39fce"
+      }
+    },
+    {
+      "id": "credit:L-0000052",
+      "kind": "credit",
+      "at": "2026-11-28T14:09:37.551917+00:00",
+      "data": {
+        "idempotency_key": "ML-0341:1",
+        "member_number": "GR-30303",
+        "stay_id": "ML-0341",
+        "points": 6120,
+        "correlation_id": "corr-3b869769"
+      }
+    },
+    {
+      "id": "credit:L-0000053",
+      "kind": "credit",
+      "at": "2026-11-28T14:09:37.751104+00:00",
+      "data": {
+        "idempotency_key": "BR-0342:1",
+        "member_number": "GR-30304",
+        "stay_id": "BR-0342",
+        "points": 1540,
+        "correlation_id": "corr-9223954a"
+      }
+    },
+    {
+      "id": "credit:L-0000054",
+      "kind": "credit",
+      "at": "2026-11-28T14:09:37.950691+00:00",
+      "data": {
+        "idempotency_key": "ML-0342:1",
+        "member_number": "GR-30305",
+        "stay_id": "ML-0342",
+        "points": 3100,
+        "correlation_id": "corr-079633c7"
+      }
+    },
+    {
+      "id": "log:82",
+      "kind": "log",
+      "at": "2026-11-28T14:09:38.427596+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:83",
+      "kind": "log",
+      "at": "2026-11-28T14:09:38.618956+00:00",
+      "data": {
+        "service": "posting",
+        "level": "WARNING",
+        "logger": "posting",
+        "message": "retrying stay.checked_out/2@21 in place after DatabaseFailure (attempt 1)",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:84",
+      "kind": "log",
+      "at": "2026-11-28T14:09:38.618956+00:00",
+      "data": {
+        "service": "posting",
+        "level": "WARNING",
+        "logger": "posting",
+        "message": "retrying stay.checked_out/1@13 in place after DatabaseFailure (attempt 2)",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:85",
+      "kind": "log",
+      "at": "2026-11-28T14:09:38.929500+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:86",
+      "kind": "log",
+      "at": "2026-11-28T14:09:39.431425+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:87",
+      "kind": "log",
+      "at": "2026-11-28T14:09:39.620594+00:00",
+      "data": {
+        "service": "posting",
+        "level": "WARNING",
+        "logger": "posting",
+        "message": "retrying stay.checked_out/2@21 in place after DatabaseFailure (attempt 3)",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:88",
+      "kind": "log",
+      "at": "2026-11-28T14:09:39.933271+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:89",
+      "kind": "log",
+      "at": "2026-11-28T14:09:40.435087+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:90",
+      "kind": "log",
+      "at": "2026-11-28T14:09:40.942101+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:91",
+      "kind": "log",
+      "at": "2026-11-28T14:09:41.443788+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:92",
+      "kind": "log",
+      "at": "2026-11-28T14:09:41.622716+00:00",
+      "data": {
+        "service": "posting",
+        "level": "WARNING",
+        "logger": "posting",
+        "message": "retrying stay.checked_out/0@18 in place after DatabaseFailure (attempt 4)",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:93",
+      "kind": "log",
+      "at": "2026-11-28T14:09:41.945301+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:94",
+      "kind": "log",
+      "at": "2026-11-28T14:09:42.446842+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:95",
+      "kind": "log",
+      "at": "2026-11-28T14:09:42.948303+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:96",
+      "kind": "log",
+      "at": "2026-11-28T14:09:43.449792+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:97",
+      "kind": "log",
+      "at": "2026-11-28T14:09:43.951484+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:98",
+      "kind": "log",
+      "at": "2026-11-28T14:09:44.453074+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:99",
+      "kind": "log",
+      "at": "2026-11-28T14:09:44.954627+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:100",
+      "kind": "log",
+      "at": "2026-11-28T14:09:45.125164+00:00",
+      "data": {
+        "service": "posting",
+        "level": "WARNING",
+        "logger": "posting",
+        "message": "retrying stay.checked_out/1@13 in place after DatabaseFailure (attempt 5)",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:101",
+      "kind": "log",
+      "at": "2026-11-28T14:09:45.456225+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:102",
+      "kind": "log",
+      "at": "2026-11-28T14:09:45.957806+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:103",
+      "kind": "log",
+      "at": "2026-11-28T14:09:46.459429+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:104",
+      "kind": "log",
+      "at": "2026-11-28T14:09:46.960895+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:105",
+      "kind": "log",
+      "at": "2026-11-28T14:09:47.462365+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:106",
+      "kind": "log",
+      "at": "2026-11-28T14:09:47.963815+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:107",
+      "kind": "log",
+      "at": "2026-11-28T14:09:48.465498+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:108",
+      "kind": "log",
+      "at": "2026-11-28T14:09:48.967063+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:109",
+      "kind": "log",
+      "at": "2026-11-28T14:09:49.468792+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:110",
+      "kind": "log",
+      "at": "2026-11-28T14:09:49.970428+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:111",
+      "kind": "log",
+      "at": "2026-11-28T14:09:50.472037+00:00",
+      "data": {
+        "service": "retry-worker",
+        "level": "ERROR",
+        "logger": "retry",
+        "message": "retry cycle failed [OperationalError]",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "event:stay.checked_out/0@16",
+      "kind": "event",
+      "at": "2026-11-28T14:09:37.140000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 0,
+        "offset": 16,
+        "key": "GR-30301",
+        "event_id": "8991b853-0a9f-5a85-9fbb-d0d0c0351fcc",
+        "schema_version": "1",
+        "correlation_id": "corr-8991b853",
+        "stay_id": "ML-0340",
+        "member_number": "GR-30301",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:09:37.140000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/0@17",
+      "kind": "event",
+      "at": "2026-11-28T14:09:37.940000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 0,
+        "offset": 17,
+        "key": "GR-30305",
+        "event_id": "079633c7-eaa6-5b41-84ff-aa97da83310b",
+        "schema_version": "1",
+        "correlation_id": "corr-079633c7",
+        "stay_id": "ML-0342",
+        "member_number": "GR-30305",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:09:37.940000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/0@18",
+      "kind": "event",
+      "at": "2026-11-28T14:09:38.540000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 0,
+        "offset": 18,
+        "key": "GR-30308",
+        "event_id": "20cab04d-af0d-5629-9ac4-534aca6f58f2",
+        "schema_version": "1",
+        "correlation_id": "corr-20cab04d",
+        "stay_id": "BR-0344",
+        "member_number": "GR-30308",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:09:38.540000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/0@19",
+      "kind": "event",
+      "at": "2026-11-28T14:09:39.140000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 0,
+        "offset": 19,
+        "key": "GR-30301",
+        "event_id": "d800b827-c883-5272-bd7a-da864f912d7a",
+        "schema_version": "1",
+        "correlation_id": "corr-d800b827",
+        "stay_id": "ML-0345",
+        "member_number": "GR-30301",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:09:39.140000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/0@20",
+      "kind": "event",
+      "at": "2026-11-28T14:09:39.940000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 0,
+        "offset": 20,
+        "key": "GR-30305",
+        "event_id": "df9c43af-e8fc-5a66-a4e1-d59b3bb2bf12",
+        "schema_version": "1",
+        "correlation_id": "corr-df9c43af",
+        "stay_id": "ML-0347",
+        "member_number": "GR-30305",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:09:39.940000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/0@21",
+      "kind": "event",
+      "at": "2026-11-28T14:09:40.540000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 0,
+        "offset": 21,
+        "key": "GR-30308",
+        "event_id": "50d73400-5458-5d58-a829-6ed6cb46ff8d",
+        "schema_version": "1",
+        "correlation_id": "corr-50d73400",
+        "stay_id": "BR-0349",
+        "member_number": "GR-30308",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:09:40.540000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/1@12",
+      "kind": "event",
+      "at": "2026-11-28T14:09:37.740000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 1,
+        "offset": 12,
+        "key": "GR-30304",
+        "event_id": "9223954a-9e6e-5340-924a-046e9c3bde43",
+        "schema_version": "1",
+        "correlation_id": "corr-9223954a",
+        "stay_id": "BR-0342",
+        "member_number": "GR-30304",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:09:37.740000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/1@13",
+      "kind": "event",
+      "at": "2026-11-28T14:09:38.340000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 1,
+        "offset": 13,
+        "key": "GR-30307",
+        "event_id": "b2022942-df3e-5c41-baba-6a08b7de2827",
+        "schema_version": "1",
+        "correlation_id": "corr-b2022942",
+        "stay_id": "ML-0343",
+        "member_number": "GR-30307",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:09:38.340000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/1@14",
+      "kind": "event",
+      "at": "2026-11-28T14:09:39.740000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 1,
+        "offset": 14,
+        "key": "GR-30304",
+        "event_id": "213e9af8-c317-5e51-9528-9dd7cdf5f131",
+        "schema_version": "1",
+        "correlation_id": "corr-213e9af8",
+        "stay_id": "BR-0347",
+        "member_number": "GR-30304",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:09:39.740000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/1@15",
+      "kind": "event",
+      "at": "2026-11-28T14:09:40.340000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 1,
+        "offset": 15,
+        "key": "GR-30307",
+        "event_id": "3c44accb-806a-5fe2-aa54-d1dc9b366c94",
+        "schema_version": "1",
+        "correlation_id": "corr-3c44accb",
+        "stay_id": "ML-0348",
+        "member_number": "GR-30307",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:09:40.340000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/2@18",
+      "kind": "event",
+      "at": "2026-11-28T14:09:36.940000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "offset": 18,
+        "key": "GR-30300",
+        "event_id": "e12177c3-6884-57e7-bd4b-8e4b5bc78ba4",
+        "schema_version": "1",
+        "correlation_id": "corr-e12177c3",
+        "stay_id": "BR-0340",
+        "member_number": "GR-30300",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:09:36.940000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/2@19",
+      "kind": "event",
+      "at": "2026-11-28T14:09:37.340000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "offset": 19,
+        "key": "GR-30302",
+        "event_id": "0ae39fce-312a-5818-9479-523cd9667d9f",
+        "schema_version": "1",
+        "correlation_id": "corr-0ae39fce",
+        "stay_id": "BR-0341",
+        "member_number": "GR-30302",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:09:37.340000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/2@20",
+      "kind": "event",
+      "at": "2026-11-28T14:09:37.540000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "offset": 20,
+        "key": "GR-30303",
+        "event_id": "3b869769-f339-51ba-9de5-fbc7da677934",
+        "schema_version": "1",
+        "correlation_id": "corr-3b869769",
+        "stay_id": "ML-0341",
+        "member_number": "GR-30303",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:09:37.540000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/2@21",
+      "kind": "event",
+      "at": "2026-11-28T14:09:38.140000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "offset": 21,
+        "key": "GR-30306",
+        "event_id": "7839836a-6a47-5e08-b8b4-0d22f8685f05",
+        "schema_version": "1",
+        "correlation_id": "corr-7839836a",
+        "stay_id": "BR-0343",
+        "member_number": "GR-30306",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:09:38.140000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/2@22",
+      "kind": "event",
+      "at": "2026-11-28T14:09:38.740000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "offset": 22,
+        "key": "GR-30309",
+        "event_id": "921353a9-067d-5c36-a4cb-e3ed615e5137",
+        "schema_version": "1",
+        "correlation_id": "corr-921353a9",
+        "stay_id": "ML-0344",
+        "member_number": "GR-30309",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:09:38.740000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/2@23",
+      "kind": "event",
+      "at": "2026-11-28T14:09:38.940000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "offset": 23,
+        "key": "GR-30300",
+        "event_id": "7fe7afcf-f330-57ea-b58a-1024c9fb9e70",
+        "schema_version": "1",
+        "correlation_id": "corr-7fe7afcf",
+        "stay_id": "BR-0345",
+        "member_number": "GR-30300",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:09:38.940000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/2@24",
+      "kind": "event",
+      "at": "2026-11-28T14:09:39.340000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "offset": 24,
+        "key": "GR-30302",
+        "event_id": "d0732a7e-a6c0-5392-9032-bdc4267d4b28",
+        "schema_version": "1",
+        "correlation_id": "corr-d0732a7e",
+        "stay_id": "BR-0346",
+        "member_number": "GR-30302",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:09:39.340000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/2@25",
+      "kind": "event",
+      "at": "2026-11-28T14:09:39.540000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "offset": 25,
+        "key": "GR-30303",
+        "event_id": "d0f19e6b-b77b-5d32-b22a-36f483c47f23",
+        "schema_version": "1",
+        "correlation_id": "corr-d0f19e6b",
+        "stay_id": "ML-0346",
+        "member_number": "GR-30303",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:09:39.540000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/2@26",
+      "kind": "event",
+      "at": "2026-11-28T14:09:40.140000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "offset": 26,
+        "key": "GR-30306",
+        "event_id": "6850f67c-bd42-58df-a32f-0e6ed5127ed6",
+        "schema_version": "1",
+        "correlation_id": "corr-6850f67c",
+        "stay_id": "BR-0348",
+        "member_number": "GR-30306",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:09:40.140000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/2@27",
+      "kind": "event",
+      "at": "2026-11-28T14:09:40.740000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "offset": 27,
+        "key": "GR-30309",
+        "event_id": "32fa374f-ffbf-593e-92eb-a4f060c54b30",
+        "schema_version": "1",
+        "correlation_id": "corr-32fa374f",
+        "stay_id": "ML-0349",
+        "member_number": "GR-30309",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:09:40.740000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:points.posted/0@16",
+      "kind": "event",
+      "at": "2026-11-28T14:09:37.210000+00:00",
+      "data": {
+        "topic": "points.posted",
+        "partition": 0,
+        "offset": 16,
+        "key": "GR-30301",
+        "event_id": "7c78acc6-5ce1-46b7-84a3-50658921ac1f",
+        "schema_version": "1",
+        "correlation_id": "corr-8991b853",
+        "stay_id": "ML-0340",
+        "member_number": "GR-30301",
+        "revision": 1,
+        "occurred_at": null,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:points.posted/0@17",
+      "kind": "event",
+      "at": "2026-11-28T14:09:38.229000+00:00",
+      "data": {
+        "topic": "points.posted",
+        "partition": 0,
+        "offset": 17,
+        "key": "GR-30305",
+        "event_id": "6922c5e5-c435-4fa0-b75a-1ad3b179b09e",
+        "schema_version": "1",
+        "correlation_id": "corr-079633c7",
+        "stay_id": "ML-0342",
+        "member_number": "GR-30305",
+        "revision": 1,
+        "occurred_at": null,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:points.posted/1@12",
+      "kind": "event",
+      "at": "2026-11-28T14:09:38.229000+00:00",
+      "data": {
+        "topic": "points.posted",
+        "partition": 1,
+        "offset": 12,
+        "key": "GR-30304",
+        "event_id": "545de1ec-aa6e-45fb-b8c4-1f7dd08a907d",
+        "schema_version": "1",
+        "correlation_id": "corr-9223954a",
+        "stay_id": "BR-0342",
+        "member_number": "GR-30304",
+        "revision": 1,
+        "occurred_at": null,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:points.posted/2@18",
+      "kind": "event",
+      "at": "2026-11-28T14:09:37.210000+00:00",
+      "data": {
+        "topic": "points.posted",
+        "partition": 2,
+        "offset": 18,
+        "key": "GR-30300",
+        "event_id": "e3c2368c-469a-4563-abd0-74745e6ca2d2",
+        "schema_version": "1",
+        "correlation_id": "corr-e12177c3",
+        "stay_id": "BR-0340",
+        "member_number": "GR-30300",
+        "revision": 1,
+        "occurred_at": null,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:points.posted/2@19",
+      "kind": "event",
+      "at": "2026-11-28T14:09:37.719000+00:00",
+      "data": {
+        "topic": "points.posted",
+        "partition": 2,
+        "offset": 19,
+        "key": "GR-30302",
+        "event_id": "f6552c3f-0fc9-4eb0-8552-0d2b153565f3",
+        "schema_version": "1",
+        "correlation_id": "corr-0ae39fce",
+        "stay_id": "BR-0341",
+        "member_number": "GR-30302",
+        "revision": 1,
+        "occurred_at": null,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:points.posted/2@20",
+      "kind": "event",
+      "at": "2026-11-28T14:09:37.719000+00:00",
+      "data": {
+        "topic": "points.posted",
+        "partition": 2,
+        "offset": 20,
+        "key": "GR-30303",
+        "event_id": "a6976219-b2d6-4e09-ab0a-9e28066d27c1",
+        "schema_version": "1",
+        "correlation_id": "corr-3b869769",
+        "stay_id": "ML-0341",
+        "member_number": "GR-30303",
+        "revision": 1,
+        "occurred_at": null,
+        "decoded": true
+      }
+    },
+    {
+      "id": "lag:posting-service/stay.checked_out/0@20261128T140950",
+      "kind": "lag",
+      "at": "2026-11-28T14:09:50.937974+00:00",
+      "data": {
+        "group": "posting-service",
+        "topic": "stay.checked_out",
+        "partition": 0,
+        "committed": 18,
+        "low": 0,
+        "high": 22,
+        "lag": 4
+      }
+    },
+    {
+      "id": "lag:posting-service/stay.checked_out/1@20261128T140950",
+      "kind": "lag",
+      "at": "2026-11-28T14:09:50.937974+00:00",
+      "data": {
+        "group": "posting-service",
+        "topic": "stay.checked_out",
+        "partition": 1,
+        "committed": 13,
+        "low": 0,
+        "high": 16,
+        "lag": 3
+      }
+    },
+    {
+      "id": "lag:posting-service/stay.checked_out/2@20261128T140950",
+      "kind": "lag",
+      "at": "2026-11-28T14:09:50.937974+00:00",
+      "data": {
+        "group": "posting-service",
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "committed": 21,
+        "low": 0,
+        "high": 28,
+        "lag": 7
+      }
+    }
+  ]
+}

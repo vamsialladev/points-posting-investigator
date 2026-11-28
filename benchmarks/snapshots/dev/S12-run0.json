@@ -1,0 +1,326 @@
+{
+  "scenario_run": "S12-run0",
+  "taken_at": "2026-11-28T14:10:45.619577+00:00",
+  "since": "2026-11-28T14:10:40+00:00",
+  "truncated": [],
+  "items": [
+    {
+      "id": "parked:22",
+      "kind": "parked",
+      "at": "2026-11-28T14:10:45.249568+00:00",
+      "data": {
+        "event_id": "21c4fe30-3bca-5e0f-897d-a81d2b422c81",
+        "member_number": "GR-30550",
+        "stay_id": "BR-0540",
+        "revision": 1,
+        "source_topic": "stay.checked_out",
+        "source_partition": 1,
+        "source_offset": 38,
+        "status": "pending",
+        "attempts": 0,
+        "transient_failures": 1,
+        "error_class": "ledger_timeout_not_found",
+        "last_error": "timeout_not_found",
+        "correlation_id": "corr-21c4fe30",
+        "first_failed_at": "2026-11-28T14:10:45.249568+00:00",
+        "last_failed_at": "2026-11-28T14:10:45.249568+00:00",
+        "done_at": null,
+        "dead_at": null
+      }
+    },
+    {
+      "id": "credit:L-0000147",
+      "kind": "credit",
+      "at": "2026-11-28T14:10:44.244009+00:00",
+      "data": {
+        "idempotency_key": "BR-0540:1",
+        "member_number": "GR-30550",
+        "stay_id": "BR-0540",
+        "points": 1500,
+        "correlation_id": "corr-21c4fe30"
+      }
+    },
+    {
+      "id": "credit:L-0000148",
+      "kind": "credit",
+      "at": "2026-11-28T14:10:45.260244+00:00",
+      "data": {
+        "idempotency_key": "ML-0540:1",
+        "member_number": "GR-30551",
+        "stay_id": "ML-0540",
+        "points": 3020,
+        "correlation_id": "corr-c112cf87"
+      }
+    },
+    {
+      "id": "log:223",
+      "kind": "log",
+      "at": "2026-11-28T14:10:41.296767+00:00",
+      "data": {
+        "service": "posting",
+        "level": "INFO",
+        "logger": "posting",
+        "message": "partitions revoked: stay.checked_out/0, stay.checked_out/1, stay.checked_out/2",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:224",
+      "kind": "log",
+      "at": "2026-11-28T14:10:41.296767+00:00",
+      "data": {
+        "service": "posting",
+        "level": "INFO",
+        "logger": "posting",
+        "message": "posting service stopped",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:225",
+      "kind": "log",
+      "at": "2026-11-28T14:10:43.211633+00:00",
+      "data": {
+        "service": "posting",
+        "level": "INFO",
+        "logger": "posting",
+        "message": "posting service started",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "log:226",
+      "kind": "log",
+      "at": "2026-11-28T14:10:43.211633+00:00",
+      "data": {
+        "service": "posting",
+        "level": "INFO",
+        "logger": "posting",
+        "message": "partitions assigned: stay.checked_out/0, stay.checked_out/1, stay.checked_out/2",
+        "correlation_id": null,
+        "trace_id": null,
+        "event_id": null
+      }
+    },
+    {
+      "id": "change:1",
+      "kind": "change",
+      "at": "2026-11-28T14:10:40.225625+00:00",
+      "data": {
+        "service": "posting",
+        "setting": "LEDGER_TIMEOUT_SECONDS",
+        "old_value": "5.0",
+        "new_value": "0.001",
+        "source": "scenario"
+      }
+    },
+    {
+      "id": "event:stay.checked_out/0@49",
+      "kind": "event",
+      "at": "2026-11-28T14:10:44.407000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 0,
+        "offset": 49,
+        "key": "GR-30551",
+        "event_id": "c112cf87-bd4b-5eb6-9b45-f34f1df2d84c",
+        "schema_version": "1",
+        "correlation_id": "corr-c112cf87",
+        "stay_id": "ML-0540",
+        "member_number": "GR-30551",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:10:44.407000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/0@50",
+      "kind": "event",
+      "at": "2026-11-28T14:10:45.607000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 0,
+        "offset": 50,
+        "key": "GR-30557",
+        "event_id": "3c0c7534-59bd-583f-a6ba-ba7763bada15",
+        "schema_version": "1",
+        "correlation_id": "corr-3c0c7534",
+        "stay_id": "ML-0543",
+        "member_number": "GR-30557",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:10:45.607000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/1@38",
+      "kind": "event",
+      "at": "2026-11-28T14:10:44.207000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 1,
+        "offset": 38,
+        "key": "GR-30550",
+        "event_id": "21c4fe30-3bca-5e0f-897d-a81d2b422c81",
+        "schema_version": "1",
+        "correlation_id": "corr-21c4fe30",
+        "stay_id": "BR-0540",
+        "member_number": "GR-30550",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:10:44.207000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/1@39",
+      "kind": "event",
+      "at": "2026-11-28T14:10:45.207000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 1,
+        "offset": 39,
+        "key": "GR-30555",
+        "event_id": "e4df27fa-7a49-56e0-b1f5-53cb5f73b8ec",
+        "schema_version": "1",
+        "correlation_id": "corr-e4df27fa",
+        "stay_id": "ML-0542",
+        "member_number": "GR-30555",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:10:45.207000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/2@57",
+      "kind": "event",
+      "at": "2026-11-28T14:10:44.607000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "offset": 57,
+        "key": "GR-30552",
+        "event_id": "af81a960-765f-5dec-904f-f927ca4f98b3",
+        "schema_version": "1",
+        "correlation_id": "corr-af81a960",
+        "stay_id": "BR-0541",
+        "member_number": "GR-30552",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:10:44.607000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/2@58",
+      "kind": "event",
+      "at": "2026-11-28T14:10:44.807000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "offset": 58,
+        "key": "GR-30553",
+        "event_id": "25b50e98-22b4-5ff4-bf8f-b3ff5ddff197",
+        "schema_version": "1",
+        "correlation_id": "corr-25b50e98",
+        "stay_id": "ML-0541",
+        "member_number": "GR-30553",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:10:44.807000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/2@59",
+      "kind": "event",
+      "at": "2026-11-28T14:10:45.007000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "offset": 59,
+        "key": "GR-30554",
+        "event_id": "a2a1c44f-48bd-555d-8367-98a0d87ad356",
+        "schema_version": "1",
+        "correlation_id": "corr-a2a1c44f",
+        "stay_id": "BR-0542",
+        "member_number": "GR-30554",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:10:45.007000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "event:stay.checked_out/2@60",
+      "kind": "event",
+      "at": "2026-11-28T14:10:45.407000+00:00",
+      "data": {
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "offset": 60,
+        "key": "GR-30556",
+        "event_id": "27107185-c623-5a1c-9582-ef3561995360",
+        "schema_version": "1",
+        "correlation_id": "corr-27107185",
+        "stay_id": "BR-0543",
+        "member_number": "GR-30556",
+        "revision": 1,
+        "occurred_at": "2026-11-28T14:10:45.407000+00:00",
+        "occurred_minus_broker_seconds": 0.0,
+        "decoded": true
+      }
+    },
+    {
+      "id": "lag:posting-service/stay.checked_out/0@20261128T141045",
+      "kind": "lag",
+      "at": "2026-11-28T14:10:45.823724+00:00",
+      "data": {
+        "group": "posting-service",
+        "topic": "stay.checked_out",
+        "partition": 0,
+        "committed": 49,
+        "low": 0,
+        "high": 51,
+        "lag": 2
+      }
+    },
+    {
+      "id": "lag:posting-service/stay.checked_out/1@20261128T141045",
+      "kind": "lag",
+      "at": "2026-11-28T14:10:45.823724+00:00",
+      "data": {
+        "group": "posting-service",
+        "topic": "stay.checked_out",
+        "partition": 1,
+        "committed": 39,
+        "low": 0,
+        "high": 40,
+        "lag": 1
+      }
+    },
+    {
+      "id": "lag:posting-service/stay.checked_out/2@20261128T141045",
+      "kind": "lag",
+      "at": "2026-11-28T14:10:45.823724+00:00",
+      "data": {
+        "group": "posting-service",
+        "topic": "stay.checked_out",
+        "partition": 2,
+        "committed": 57,
+        "low": 0,
+        "high": 61,
+        "lag": 4
+      }
+    }
+  ]
+}
