@@ -194,8 +194,9 @@ set differs from the entry's.
 - **Rules enough:** yes
 
 ### S12: Recent config change
-- **Trigger:** `trigger S12`. Records a configuration change, restarts the posting service with a ledger timeout
-  far below the ledger's normal answer time, then sends events. The ledger itself is not slowed.
+- **Trigger:** `trigger S12`. Records a configuration change, restarts the posting service and its retry worker
+  with a ledger timeout far below the ledger's normal answer time, then sends events. The ledger itself is not
+  slowed.
 - **Expected behaviour:** as S03 from the pipeline's side: timeouts, transient parking, nothing dead-lettered.
 - **Root cause:** `recent_config_change`
 - **Evidence:** parked events with `error_class` `ledger_timeout_not_found`; ledger request times low and normal; a change
@@ -222,7 +223,7 @@ set differs from the entry's.
 
 ### S14: Partition rebalance storm
 - **Trigger:** `trigger S14`. Makes extra consumers join and leave the posting group repeatedly while events flow.
-- **Expected behaviour:** partitions move again and again; some events are redelivered; nothing is lost and nothing
+- **Expected behaviour:** partitions move again and again; an event can be redelivered; nothing is lost and nothing
   is credited twice; posting is slow while it lasts.
 - **Root cause:** `rebalance_storm`
 - **Evidence:** many "partitions revoked" and "partitions assigned" lines from the posting service within a short
